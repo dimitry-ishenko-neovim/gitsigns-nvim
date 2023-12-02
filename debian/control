@@ -1,0 +1,33 @@
+Source: gitsigns-nvim
+Section: editors
+Priority: optional
+Maintainer: Dimitry Ishenko <dimitry.ishenko@gmail.com>
+Build-Depends:
+ debhelper-compat (= 12),
+ dh-vim-addon
+Standards-Version: 4.6.0
+Homepage: https://github.com/lewis6991/gitsigns.nvim
+Vcs-Browser: https://github.com/dimitry-ishenko-vim/gitsigns-nvim
+Vcs-Git: https://github.com/dimitry-ishenko-vim/gitsigns-nvim.git
+Rules-Requires-Root: no
+
+Package: gitsigns-nvim
+Architecture: all
+Depends: ${misc:Depends}, neovim (>= 0.8.0)
+Description: Git integration for neovim
+ Super fast git decorations implemented purely in Lua.
+ Features:
+   * Signs for added, removed, and changed lines.
+   * Asynchronous using luv.
+   * Navigation between hunks.
+   * Stage hunks (with undo).
+   * Preview diffs of hunks (with word diff).
+   * Customizable (signs, highlights, mappings, etc).
+   * Status bar integration.
+   * Git blame a specific line using virtual text.
+   * Hunk text object.
+   * Automatically follow files moved in the index.
+   * Live intra-line word diff.
+   * Ability to display deleted/changed lines via virtual lines.
+   * Support for yadm.
+   * Support for detached working trees.

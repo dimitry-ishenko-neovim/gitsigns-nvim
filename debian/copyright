@@ -1,0 +1,12 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Source: https://github.com/lewis6991/gitsigns.nvim
+Upstream-Name: gitsigns.nvim
+Upstream-Contact: Lewis Russel <me@lewisr.dev>
+
+Files: *
+Copyright: 2023 Lewis Russel <me@lewisr.dev>
+License: MIT
+
+Files: debian/*
+Copyright: 2023 Dimitry Ishenko <dimitry.ishenko@gmail.com>
+License: GPL-3.0+
