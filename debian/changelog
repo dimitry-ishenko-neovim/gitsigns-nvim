@@ -1,5 +1,282 @@
-gitsigns-nvim (0.7-1) UNRELEASED; urgency=medium
+gitsigns-nvim (0.7-1) unstable; urgency=medium
 
-  * Initial release.
+  [ Lewis Russell ]
+  * feat: staged signs
+  * feat: parse flags
+  * fix: do not error if cwd does not exist
+  * doc: ts syntax highlighting
+  * fix: add nil check
+  * chore: add FUNDING.yml
+  * refactor: some style changes
+  * refactor: move cli to separate module
+  * feat: use vim.iconv
+  * feat: staged signs support for preview and nav
+  * chore: remove PULL_REQUEST_TEMPLATE.md
+  * fix(blame): #697
 
- -- Dimitry Ishenko <dimitry.ishenko@gmail.com>  Sun, 13 Aug 2023 14:33:42 -0400
+  [ Wesley Merkel ]
+  * feat: move hunk preview window while scrolling
+
+  [ Lewis Russell ]
+  * feat: remove FFI diff implementation
+  * Revert "feat: move hunk preview window while scrolling"
+  * fix: do not focus preview when navigating hunks
+
+  [ Wesley Merkel ]
+  * fix: don't move preview window while it's focused
+
+  [ Lewis Russell ]
+  * feat: yet another async implementation
+  * refactor: denest a bit
+  * fix: error handling
+  * feat!: rework highlights and document them
+  * refactor: tidy up subprocess.tl
+  * fix(highlight): several fixes from last PR
+
+  [ Alfonso Ros ]
+  * fix: use fugitive functions to parse fugitive:// url
+
+  [ Lewis Russell ]
+  * fix(preview): fix topline viewing
+  * fix: fugitive check
+  * feat: use staged signs for commit buffers
+  * refactor(cache): use method style syntax
+
+  [ Rocky Zhang ]
+  * fix(highlight): add missing staged highlights
+
+  [ Lewis Russell ]
+  * fix: don't run iconv on utf-16
+  * chore: fix some teal issues from 0.15.1
+  * fix(highlight): apply fallback even if not defined
+
+  [ Sindre T. Strøm ]
+  * feat: Enable `attach()` to work with any buffer when given context data
+
+  [ Lewis Russell ]
+  * fix(diffthis): don't change the current window
+  * fix(ci): update for latest changes on HEAD
+
+  [ Raphael ]
+  * docs: lspsaga extend gitsigns action
+
+  [ Lewis Russell ]
+  * fix(ci): better condition
+  * fix(ci): fixup
+  * fix(windows): remove carriage return when staging
+
+  [ Hugo Osvaldo Barrera ]
+  * fix: add space at the end of blame virtual text
+
+  [ Lewis Russell ]
+  * fix(preview): close preview properly
+  * chore(git): add async annotations
+  * feat: add comments to generated lua files
+  * feat: add more comments to generated lua files
+
+  [ dundargoc ]
+  * ci: add ci.yml and Makefile as part of the cache key
+  * ci: use clang instead of gcc compiler
+
+  [ Lewis Russell ]
+  * perf: reduce startup time
+
+  [ dundargoc ]
+  * docs: fix typo
+  * ci: fix cache key (#761)
+  * ci: don't install unnecessary former neovim dependencies (#760)
+
+  [ Lewis Russell ]
+  * fix(cli): print results of functions
+  * fix(debug): do not return list when echoing
+
+  [ Alexander Garcia ]
+  * fix(update_show_deleted): show_deleted when buffer not in cache
+
+  [ Alex Chen ]
+  * docs: require nvim 0.8+
+
+  [ dundargoc ]
+  * feat!: remove unnecessary healthchecks
+
+  [ Lewis Russell ]
+  * fix(current_line_blame): check valid buffers when resetting
+  * doc(README): use lua functions in keybindings
+
+  [ Matt Mirus ]
+  * fix(README): correct undefined `line()` to `vim.fn.line()`
+
+  [ Lewis Russell ]
+  * feat(preview): improved version of preview_hunk_inline()
+  * refactor: add some emmy types
+  * refactor: add some emmy types (2)
+  * refactor: add some emmy types (3)
+
+  [ Gerson Sosa ]
+  * fix(toggle_current_line_blame): check signs_normal is not nil
+
+  [ Lewis Russell ]
+  * fix: staged_signs with legacy signs
+  * fix(blame): handle changes from git 2.41
+  * refactor: remove teal
+  * fix: vendor testsuite
+  * refactor: post teal-pocolypse cleanup
+  * docs: remove installation instructions
+  * refactor: remove .luacheckrc
+  * chore: update bug template
+  * chore: update .gitattributes
+  * chore: update .editorconfig
+  * fix: remove bad assert
+  * fix(diffthis): re-use buffers
+
+  [ Daniel M. Capella ]
+  * docs: consistent quotes
+
+  [ Lewis Russell ]
+  * chore: add selene config
+  * chore: more emmy types
+  * feat: enable threaded diff by default
+  * feat!: remove config.keymaps
+  * feat(watcher): move from libuv poll to file event watcher
+  * refactor(tests): tidy up
+  * fix(watcher): debounce per watcher
+  * docs: update
+  * chore(gitignore): add .luarocks
+  * fix(inline_preview2): further maturity
+  * fix(blame): don't run concurrent blames
+  * refactor: move gitdir watcher to separate module
+  * chore: run through stylua
+  * docs: make gen_help.lua emmy aware
+  * chore: formatting
+  * chore: formatting (2)
+  * chore: formatting (3)
+  * feat: add .luarc.json
+  * docs: update CONTRIBUTING.md
+
+  [ Shaopeng Dai ]
+  * fix: no commit message
+
+  [ Rocky Zhang ]
+  * fix: missing bottom border Fixes: https://github.com/lewis6991/gitsigns.nvim/issues/841
+
+  [ Lewis Russell ]
+  * fix: improve typing
+  * feat(config): lazy resolve config default values
+  * chore: add better assertion message
+  * fix: assertion message
+
+  [ Yuta Katayama ]
+  * fix: git rc release version causes assertion error
+
+  [ Lewis Russell ]
+  * docs: remove null-ls doc
+
+  [ Toby Hutton ]
+  * fix: accommodate watcher receiving a nil filename. (#851)
+
+  [ Lewis Russell ]
+  * chore: update .luarc.json
+  * fix: typing
+  * fix: check valid buffer when scheduling
+
+  [ Ryan Rawlings ]
+  * fix: change awrap to wrap in diffthis.lua
+
+  [ Lewis Russell ]
+  * ci: add response action
+  * ci: stale action fixup
+  * fix(cli): do not print result of toggle functions
+  * fix(diff): better handling of final newline
+  * fix(reset_buffer): do not insert extra newline
+  * fix(watcher): check for detached buffers
+  * fix(actions.show): check buffer is attached
+
+  [ luokai ]
+  * fix(blame): If it has been detached, the cache[bufnr] is nil
+
+  [ Lewis Russell ]
+  * fix: typing
+  * fix(attach): check cache status between async calls
+  * fix: typing
+  * fix: handle when cache is invalidated during updates
+
+  [ Patrick Klitzke ]
+  * fix: update signature of setup to not allow require an argument
+
+  [ Marcus Caisey ]
+  * fix(setqflist): don't strip trailing newline from working tree state
+
+  [ Lewis Russell ]
+  * docs: annotate codeblocks with lang
+  * test: nvim 0.10 change for decor provider win range
+  * fix(blame): do not run concurrent processes
+  * perf(blame): run blame for entire file instead of per line
+  * test: cleanup setup
+  * fix(actions): CLI for setloclist and setqflist
+  * fix(blame): trim virt_text when using right_align
+  * fix(blame): better error message when blame fails
+  * docs: update CONTRIBUTING.md
+  * fix: stylua
+  * build: add doc and lint check
+  * chore: ignore stylua
+
+  [ AThePeanut4 ]
+  * fix(cli): named args not working
+
+  [ Lewis Russell ]
+  * fix: inline2 fixes
+  * fix(dos): remove incorrect CR
+  * fix: better bom handling
+  * fix(blame): mistakes in blame parsing
+  * fix(blame): convert CRLF to LF in commit info
+  * perf(blame): better cache invalidation
+  * test: speed up some tests
+  * test: reduce delays
+  * test: refactor
+  * refactor: vendor vim.system
+  * refactor: more test stuff
+  * feat(diffopt): add support for whitespace flags in diffopt
+  * feat(diff): allow to diff against the working version
+  * fix(git): respect env vars
+  * fix(actions): set less lines when reseting hunks
+  * fix: FILE with untracked
+  * fix(blame): add line threshold for large files
+  * fix: issue #888
+  * fix(current_line_blame): fix window target
+  * refactor(preview): simplify linespec code
+  * fix: refresh on set bomb/eol
+  * refactor: rename variable
+  * chore: tidying
+  * feat: enable extmark signs by default
+  * chore: stylua test code
+  * test: more tidying
+
+  [ Apinant.u ]
+  * fix(README): correct default value Lspsaga integration.
+
+  [ rafascar ]
+  * fix(README): add default config.current_line_blame_opts.virt_text_priority
+
+  [ Lewis Russell ]
+  * refactor: popup
+  * fix(async): return correct values
+
+  [ Theo Fabi ]
+  * fix(cli): return silently if `ui.select` cancelled
+
+  [ Maurice Wangleng Tan ]
+  * fix: gitsigns not attached due to async not returning
+
+  [ Lewis Russell ]
+  * feat: interleave attaches on startup
+
+  [ Dema ]
+  * fix: prevent gitsigns from calling diffthis on fugitive status window
+
+  [ Lewis Russell ]
+  * fix(preview): handle staged hunks
+
+  [ Dimitry Ishenko ]
+  * Add Debian packaging
+
+ -- Dimitry Ishenko <dimitry.ishenko@gmail.com>  Fri, 01 Dec 2023 19:58:19 -0500
