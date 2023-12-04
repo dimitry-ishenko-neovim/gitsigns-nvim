@@ -1,3 +1,10 @@
+gitsigns-nvim (0.7-2) unstable; urgency=medium
+
+  * Add gbp.conf
+  * Add matching word highlights
+
+ -- Dimitry Ishenko <dimitry.ishenko@gmail.com>  Sun, 03 Dec 2023 20:46:59 -0500
+
 gitsigns-nvim (0.7-1) unstable; urgency=medium
 
   [ Lewis Russell ]
