@@ -49,3 +49,7 @@ EOF
 highlight GitSignsAdd    ctermfg=darkgreen
 highlight GitSignsChange ctermfg=darkyellow
 highlight GitSignsDelete ctermfg=darkred
+
+highlight GitSignsAddInline    ctermbg=green
+highlight GitSignsChangeInline ctermbg=yellow
+highlight GitSignsDeleteInline ctermbg=red
