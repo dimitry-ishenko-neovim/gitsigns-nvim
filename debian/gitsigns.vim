@@ -29,19 +29,19 @@ require("gitsigns").setup({
       return "<Ignore>"
     end, { expr = true })
 
-    map("n", "<leader>hb", function() gs.blame_line({ full = true }) end)
-    map("n", "<leader>hd", gs.diffthis)
-    map("n", "<leader>hp", gs.preview_hunk)
-    map("n", "<leader>hr", gs.reset_hunk)
-    map("v", "<leader>hr", function() gs.reset_hunk({ vim.fn.line("."), vim.fn.line("v") }) end)
-    map("n", "<leader>hR", gs.reset_buffer)
-    map("n", "<leader>hs", gs.stage_hunk)
-    map("v", "<leader>hs", function() gs.stage_hunk({ vim.fn.line("."), vim.fn.line("v") }) end)
-    map("n", "<leader>hS", gs.stage_buffer)
-    map("n", "<leader>hu", gs.undo_stage_hunk)
-    map("n", "<leader>td", gs.toggle_deleted)
+    map("n", "tb", function() gs.blame_line({ full = true }) end)
+    map("n", "td", gs.diffthis)
+    map("n", "tp", gs.preview_hunk)
+    map("n", "tr", gs.reset_hunk)
+    map("v", "tr", function() gs.reset_hunk({ vim.fn.line("."), vim.fn.line("v") }) end)
+    map("n", "tR", gs.reset_buffer)
+    map("n", "ts", gs.stage_hunk)
+    map("v", "ts", function() gs.stage_hunk({ vim.fn.line("."), vim.fn.line("v") }) end)
+    map("n", "tS", gs.stage_buffer)
+    map("n", "tu", gs.undo_stage_hunk)
+    map("n", "td", gs.toggle_deleted)
 
-    map({"o", "x"}, "ih", ":<c-u>Gitsigns select_hunk<cr>")
+    map({"o", "x"}, "t", ":<c-u>Gitsigns select_hunk<cr>")
   end
 })
 EOF
