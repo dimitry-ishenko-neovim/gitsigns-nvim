@@ -1,3 +1,9 @@
+gitsigns-nvim (0.7-3) unstable; urgency=medium
+
+  * Simplify shortcuts
+
+ -- Dimitry Ishenko <dimitry.ishenko@gmail.com>  Fri, 08 Dec 2023 22:58:31 -0500
+
 gitsigns-nvim (0.7-2) unstable; urgency=medium
 
   * Add gbp.conf
