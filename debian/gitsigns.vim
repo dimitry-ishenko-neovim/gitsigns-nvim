@@ -39,7 +39,7 @@ require("gitsigns").setup({
     map("v", "ts", function() gs.stage_hunk({ vim.fn.line("."), vim.fn.line("v") }) end)
     map("n", "tS", gs.stage_buffer)
     map("n", "tu", gs.undo_stage_hunk)
-    map("n", "td", gs.toggle_deleted)
+    map("n", "tt", gs.toggle_deleted)
 
     map({"o", "x"}, "t", ":<c-u>Gitsigns select_hunk<cr>")
   end
