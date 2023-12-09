@@ -1,3 +1,9 @@
+gitsigns-nvim (0.7-4) unstable; urgency=medium
+
+  * Fix clashing maps
+
+ -- Dimitry Ishenko <dimitry.ishenko@gmail.com>  Fri, 08 Dec 2023 23:12:46 -0500
+
 gitsigns-nvim (0.7-3) unstable; urgency=medium
 
   * Simplify shortcuts
