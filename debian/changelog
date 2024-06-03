@@ -1,3 +1,83 @@
+gitsigns-nvim (0.8.1-1) unstable; urgency=medium
+
+  * e93a158 feat: update issue templates
+  * 87640f5 Update README.md
+  * 017c924 test: use the classic vim colorscheme for nvim nightly
+  * 6e05045 fix(manager): manager.update() never resolve when buf_check() fails
+  * aeab36f fix(dos): correct check for dos files
+  * e20c96e fix(setqflist): CLI
+  * d195f0c feat: enable the new version of inline_preview
+  * 3e6e91b feat: configurable auto attach (#918)
+  * 4aaacbf fix: typo in README
+  * c5ff762 fix: update lua-guide link in README
+  * 300a306 fix: use documented highlight groups as fallback
+  * 590d077 feat!: change default of attached_to_untracked to false
+  * 47a1e8f test: fix type annotations
+  * 0a2a93f test: simplify msgpack_rpc_stream
+  * fb9fd53 fix(hl): highlights for Nvim v0.9
+  * 2c2463d fix(docs)!: Use the new attached_to_untracked setting
+  * 41dc075 fix: changedelete symbol with linematch enabled
+  * 4e34864 fix(git): support older versions of git
+  * 078041e fix(watcher): improve buffer check in handler
+  * 70584ff fix(blame): check buffer still exists after loading
+  * 3cb0f84 fix(version): handle version checks more gracefully
+  * 1bb277b feat(yadm): deprecate
+  * 070875f feat: publish releases to luarocks
+  * a4db718 fix: bad deprecation message
+  * b616ccb docs: add mini.diff to similar plugins
+  * 2d12719 ci: update conventional commits
+  * 4e90cf9 feat(actions): add callback to async actions
+  * 690f298 fix: followup
+  * 50577f0 fix(diffthis): populate b:gitsigns_head
+  * 0994d89 feat(blame): add rev option to blame_line()
+  * 1b288a1 ci: fix nightly
+  * 4a1bc2e test: fix nightly
+  * 955d16e test: fix nightly
+  * 096d083 test: migrate to nvim-test
+  * 7e31d81 fix(cli): do not print result
+  * 22c0ab8 docs: change README.md configuration signs to match actual defaults
+  * 4db6e85 chore: stylua
+  * b45ff86 feat(popup): add `q` keymap to quit
+  * 224a319 docs: add documentation for current_line_blame_formatter_opts.relative_time
+  * 2b96835 fix(actions): prev_hunk works with wrap on line 1
+  * 1389134 fix: trigger GitSignsUpdate autocmd more often
+  * 3358280 feat(blame): support extra options
+  * 826ad69 fix: do not error when cwd does not exist
+  * f0733b7 fix(current_line_blame): update on WinResized
+  * fa052c2 chore: format
+  * 5f267aa fix(blame): put ignore-revs-file in correct position
+  * c093623 fix: check for WinResized
+  * 59bdc18 feat(nav): add nav_hunk()
+  * ee5b6ba fix(nav): followup for #976
+  * ec6aab1 feat(autocmd) add GitSignsChanged
+  * ade22fc chore: format
+  * 320b232 refactor: remove unused field
+  * 81369ed fix: attach to fugitive and gitsigns buffers
+  * 1a50b94 fix: check bcache in get_hunks
+  * c097cb2 fix(stage): staging of files with no nl at eof
+  * d96ef3b chore: remove selene
+  * c025161 refacto: misc refactoring (#983)
+  * 05226b4 fix: #986
+  * 099784e test: add luals checking
+  * cd6c831 build: use downloaded lua-language-server
+  * 36d961d fix: #989
+  * 2215c64 ci: add release-please workflow
+  * 42fda8e ci: add release-please config
+  * 36181d6 ci: adjust release-please config
+  * f0447b7 ci: release-please
+  * 031abb0 fix: release-please branch
+  * 52f8da3 chore(main): release 0.8.0
+  * e788ef7 ci: update lua action
+  * 9f8a1ed ci: tag release branch on release
+  * 43799bc ci: move luarocks upload to release workflow
+  * 4475b3e ci: fix luarocks version
+  * 7e38f07 fix(blame): check win is valid after running blame
+  * 035da03 fix(yadm): correct ls-files check
+  * 7aa9a56 fix(reset): handle 'endofline' when resetting hunks
+  * 76927d1 chore(main): release 0.8.1
+
+ -- Dimitry Ishenko <dimitry.ishenko@gmail.com>  Sun, 02 Jun 2024 21:55:41 -0400
+
 gitsigns-nvim (0.7-4) unstable; urgency=medium
 
   * Fix clashing maps
