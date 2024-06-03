@@ -11,6 +11,7 @@ local min, max = math.min, math.max
 --- @field start integer
 --- @field count integer
 --- @field lines string[]
+--- @field no_nl_at_eof? true
 
 --- @class (exact) Gitsigns.Hunk.Hunk
 --- @field type Gitsigns.Hunk.Type
@@ -164,11 +165,12 @@ end
 
 --- Calculate signs needed to be applied from a hunk for a specified line range.
 --- @param hunk Gitsigns.Hunk.Hunk
+--- @param next Gitsigns.Hunk.Hunk?
 --- @param min_lnum integer
 --- @param max_lnum integer
 --- @param untracked boolean
 --- @return Gitsigns.Sign[]
-function M.calc_signs(hunk, min_lnum, max_lnum, untracked)
+function M.calc_signs(hunk, next, min_lnum, max_lnum, untracked)
   assert(
     not untracked or hunk.type == 'add',
     string.format('Invalid hunk with untracked=%s hunk="%s"', untracked, hunk.head)
@@ -191,11 +193,21 @@ function M.calc_signs(hunk, min_lnum, max_lnum, untracked)
 
   local cend = change_end(hunk)
 
-  for lnum = max(start, min_lnum), min(cend, max_lnum) do
-    local changedelete = hunk.type == 'change' and removed > added and lnum == cend
+  -- if this is a change hunk, mark changedelete if lines were removed or if the
+  -- next hunk removes on this hunks last line
+  local changedelete = false
+  if hunk.type == 'change' then
+    changedelete = removed > added
+    if next ~= nil and next.type == 'delete' then
+      changedelete = changedelete or hunk.added.start + hunk.added.count - 1 == next.added.start
+    end
+  end
 
+  for lnum = max(start, min_lnum), min(cend, max_lnum) do
     signs[#signs + 1] = {
-      type = changedelete and 'changedelete' or untracked and 'untracked' or hunk.type,
+      type = (changedelete and lnum == cend) and 'changedelete'
+        or untracked and 'untracked'
+        or hunk.type,
       count = lnum == start and (hunk.type == 'add' and added or removed) or nil,
       lnum = lnum,
     }
@@ -243,8 +255,8 @@ function M.create_patch(relpath, hunks, mode_bits, invert)
     local now_lines = process_hunk.added.lines
 
     if invert then
-      pre_count, now_count = now_count, pre_count
-      pre_lines, now_lines = now_lines, pre_lines
+      pre_count, now_count = now_count, pre_count --- @type integer, integer
+      pre_lines, now_lines = now_lines, pre_lines --- @type string[], string[]
     end
 
     table.insert(
@@ -254,8 +266,17 @@ function M.create_patch(relpath, hunks, mode_bits, invert)
     for _, l in ipairs(pre_lines) do
       results[#results + 1] = '-' .. l
     end
+
+    if process_hunk.removed.no_nl_at_eof then
+      results[#results + 1] = '\\ No newline at end of file'
+    end
+
     for _, l in ipairs(now_lines) do
       results[#results + 1] = '+' .. l
+    end
+
+    if process_hunk.added.no_nl_at_eof then
+      results[#results + 1] = '\\ No newline at end of file'
     end
 
     process_hunk.removed.start = start + offset
@@ -305,39 +326,41 @@ end
 
 --- @param lnum integer
 --- @param hunks Gitsigns.Hunk.Hunk[]
---- @param forwards boolean
+--- @param direction 'first'|'last'|'next'|'prev'
 --- @param wrap boolean
---- @return Gitsigns.Hunk.Hunk, integer
-function M.find_nearest_hunk(lnum, hunks, forwards, wrap)
-  local ret --- @type Gitsigns.Hunk.Hunk
-  local index --- @type integer
-  local distance = math.huge
-  if forwards then
-    for i = 1, #hunks do
-      local hunk = hunks[i]
-      local dist = hunk.added.start - lnum
-      if dist > 0 and dist < distance then
-        distance = dist
-        ret = hunk
-        index = i
-      end
+--- @return integer?
+function M.find_nearest_hunk(lnum, hunks, direction, wrap)
+  if direction == 'first' then
+    return 1
+  elseif direction == 'last' then
+    return #hunks
+  elseif direction == 'next' then
+    if hunks[1].added.start > lnum then
+      return 1
     end
-  else
     for i = #hunks, 1, -1 do
-      local hunk = hunks[i]
-      local dist = lnum - hunk.vend
-      if dist > 0 and dist < distance then
-        distance = dist
-        ret = hunk
-        index = i
+      if hunks[i].added.start <= lnum then
+        if i + 1 <= #hunks and hunks[i + 1].added.start > lnum then
+          return i + 1
+        elseif wrap then
+          return 1
+        end
+      end
+    end
+  elseif direction == 'prev' then
+    if math.max(hunks[#hunks].vend) < lnum then
+      return #hunks
+    end
+    for i = 1, #hunks do
+      if lnum <= math.max(hunks[i].vend, 1) then
+        if i > 1 and math.max(hunks[i - 1].vend, 1) < lnum then
+          return i - 1
+        elseif wrap then
+          return #hunks
+        end
       end
     end
   end
-  if not ret and wrap then
-    index = forwards and 1 or #hunks
-    ret = hunks[index]
-  end
-  return ret, index
 end
 
 --- @param a Gitsigns.Hunk.Hunk[]?

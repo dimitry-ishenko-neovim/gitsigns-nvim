@@ -11,9 +11,7 @@ local throttle_by_id = require('gitsigns.debounce').throttle_by_id
 
 local log = require('gitsigns.debug.log')
 local dprint = log.dprint
-local dprintf = log.dprintf
 
-local system = require('gitsigns.system')
 local util = require('gitsigns.util')
 local run_diff = require('gitsigns.diff')
 
@@ -41,16 +39,22 @@ local function apply_win_signs0(bufnr, signs, hunks, top, bot, clear, untracked)
   end
 
   for i, hunk in ipairs(hunks or {}) do
+    --- @type Gitsigns.Hunk.Hunk?
+    local next = hunks[i + 1]
+
     -- To stop the sign column width changing too much, if there are signs to be
     -- added but none of them are visible in the window, then make sure to add at
     -- least one sign. Only do this on the first call after an update when we all
     -- the signs have been cleared.
     if clear and i == 1 then
-      signs:add(bufnr, gs_hunks.calc_signs(hunk, hunk.added.start, hunk.added.start, untracked))
+      signs:add(
+        bufnr,
+        gs_hunks.calc_signs(hunk, next, hunk.added.start, hunk.added.start, untracked)
+      )
     end
 
     if top <= hunk.vend and bot >= hunk.added.start then
-      signs:add(bufnr, gs_hunks.calc_signs(hunk, top, bot, untracked))
+      signs:add(bufnr, gs_hunks.calc_signs(hunk, next, top, bot, untracked))
     end
     if hunk.added.start > bot then
       break
@@ -428,30 +432,27 @@ local function update_show_deleted(bufnr)
   end
 end
 
---- @param bufnr? integer
+--- @async
+--- @nodiscard
+--- @param bufnr integer
 --- @param check_compare_text? boolean
---- @param cb function
-M.buf_check = async.wrap(function(bufnr, check_compare_text, cb)
-  vim.schedule(function()
-    if bufnr then
-      if not api.nvim_buf_is_valid(bufnr) then
-        dprint('Buffer not valid, aborting')
-        return
-      end
-      if not cache[bufnr] then
-        dprint('Has detached, aborting')
-        return
-      end
-      if check_compare_text and not cache[bufnr].compare_text then
-        dprint('compare_text was invalid, aborting')
-        return
-      end
-    end
-    cb()
-  end)
-end, 3)
-
-local update_cnt = 0
+--- @return boolean
+function M.schedule(bufnr, check_compare_text)
+  async.scheduler()
+  if not api.nvim_buf_is_valid(bufnr) then
+    dprint('Buffer not valid, aborting')
+    return false
+  end
+  if not cache[bufnr] then
+    dprint('Has detached, aborting')
+    return false
+  end
+  if check_compare_text and not cache[bufnr].compare_text then
+    dprint('compare_text was invalid, aborting')
+    return false
+  end
+  return true
+end
 
 --- Ensure updates cannot be interleaved.
 --- Since updates are asynchronous we need to make sure an update isn't performed
@@ -459,8 +460,9 @@ local update_cnt = 0
 --- update after the current one has completed.
 --- @param bufnr integer
 M.update = throttle_by_id(function(bufnr)
-  local __FUNC__ = 'update'
-  M.buf_check(bufnr)
+  if not M.schedule(bufnr) then
+    return
+  end
   local bcache = cache[bufnr]
   local old_hunks, old_hunks_staged = bcache.hunks, bcache.hunks_staged
   bcache.hunks, bcache.hunks_staged = nil, nil
@@ -473,22 +475,30 @@ M.update = throttle_by_id(function(bufnr)
 
   if not bcache.compare_text or config._refresh_staged_on_update or file_mode then
     bcache.compare_text = git_obj:get_show_text(compare_rev)
-    M.buf_check(bufnr, true)
+    if not M.schedule(bufnr, true) then
+      return
+    end
   end
 
   local buftext = util.buf_lines(bufnr)
 
   bcache.hunks = run_diff(bcache.compare_text, buftext)
-  M.buf_check(bufnr)
+  if not M.schedule(bufnr) then
+    return
+  end
 
   if config._signs_staged_enable and not file_mode then
     if not bcache.compare_text_head or config._refresh_staged_on_update then
       local staged_compare_rev = bcache.commit and string.format('%s^', bcache.commit) or 'HEAD'
       bcache.compare_text_head = git_obj:get_show_text(staged_compare_rev)
-      M.buf_check(bufnr, true)
+      if not M.schedule(bufnr, true) then
+        return
+      end
     end
     local hunks_head = run_diff(bcache.compare_text_head, buftext)
-    M.buf_check(bufnr)
+    if not M.schedule(bufnr) then
+      return
+    end
     bcache.hunks_staged = gs_hunks.filter_common(hunks_head, bcache.hunks)
   end
 
@@ -506,19 +516,10 @@ M.update = throttle_by_id(function(bufnr)
     update_show_deleted(bufnr)
     bcache.force_next_update = false
 
-    api.nvim_exec_autocmds('User', {
-      pattern = 'GitSignsUpdate',
-      modeline = false,
-    })
+    local summary = gs_hunks.get_summary(bcache.hunks)
+    summary.head = git_obj.repo.abbrev_head
+    Status:update(bufnr, summary)
   end
-
-  local summary = gs_hunks.get_summary(bcache.hunks)
-  summary.head = git_obj.repo.abbrev_head
-  Status:update(bufnr, summary)
-
-  update_cnt = update_cnt + 1
-
-  dprintf('updates: %s, jobs: %s', update_cnt, system.job_cnt)
 end, true)
 
 --- @param bufnr integer
@@ -584,7 +585,7 @@ function M.setup()
     signs_staged = Signs.new(config._signs_staged, 'staged')
   end
 
-  M.update_debounced = debounce_trailing(config.update_debounce, async.void(M.update))
+  M.update_debounced = debounce_trailing(config.update_debounce, async.create(1, M.update))
 end
 
 return M

@@ -11,8 +11,6 @@ local config = require('gitsigns.config').config
 local debounce_trailing = require('gitsigns.debounce').debounce_trailing
 local manager = require('gitsigns.manager')
 
-local buf_check = manager.buf_check
-
 local dprint = log.dprint
 local dprintf = log.dprintf
 
@@ -46,7 +44,9 @@ local function handle_moved(bufnr, old_relpath)
   git_obj.file = git_obj.repo.toplevel .. util.path_sep .. git_obj.relpath
   bcache.file = git_obj.file
   git_obj:update_file_info()
-  async.scheduler_if_buf_valid(bufnr)
+  if not manager.schedule(bufnr) then
+    return
+  end
 
   local bufexists = util.bufexists(bcache.file)
   local old_name = api.nvim_buf_get_name(bufnr)
@@ -59,40 +59,49 @@ local function handle_moved(bufnr, old_relpath)
   dprintf('%s buffer %d from %s to %s', msg, bufnr, old_name, bcache.file)
 end
 
-local handler = debounce_trailing(
-  200,
-  --- @param bufnr integer
-  async.void(function(bufnr)
-    local __FUNC__ = 'watcher_handler'
-    buf_check(bufnr)
+--- @param bufnr integer
+local watcher_handler = async.create(1, function(bufnr)
+  local __FUNC__ = 'watcher_handler'
 
-    local git_obj = cache[bufnr].git_obj
+  -- Avoid cache hit for detached buffer
+  -- ref: https://github.com/lewis6991/gitsigns.nvim/issues/956
+  if not manager.schedule(bufnr) then
+    return
+  end
 
-    git_obj.repo:update_abbrev_head()
+  local git_obj = cache[bufnr].git_obj
 
-    buf_check(bufnr)
+  git_obj.repo:update_abbrev_head()
 
-    Status:update(bufnr, { head = git_obj.repo.abbrev_head })
+  if not manager.schedule(bufnr) then
+    return
+  end
 
-    local was_tracked = git_obj.object_name ~= nil
-    local old_relpath = git_obj.relpath
+  Status:update(bufnr, { head = git_obj.repo.abbrev_head })
 
-    git_obj:update_file_info()
-    buf_check(bufnr)
+  local was_tracked = git_obj.object_name ~= nil
+  local old_relpath = git_obj.relpath
 
-    if config.watch_gitdir.follow_files and was_tracked and not git_obj.object_name then
-      -- File was tracked but is no longer tracked. Must of been removed or
-      -- moved. Check if it was moved and switch to it.
-      handle_moved(bufnr, old_relpath)
-      buf_check(bufnr)
+  git_obj:update_file_info()
+  if not manager.schedule(bufnr) then
+    return
+  end
+
+  if config.watch_gitdir.follow_files and was_tracked and not git_obj.object_name then
+    -- File was tracked but is no longer tracked. Must of been removed or
+    -- moved. Check if it was moved and switch to it.
+    handle_moved(bufnr, old_relpath)
+    if not manager.schedule(bufnr) then
+      return
     end
+  end
 
-    cache[bufnr]:invalidate(true)
+  cache[bufnr]:invalidate(true)
 
-    require('gitsigns.manager').update(bufnr)
-  end),
-  1
-)
+  require('gitsigns.manager').update(bufnr)
+end)
+
+local watcher_handler_debounced = debounce_trailing(200, watcher_handler, 1)
 
 --- vim.inspect but on one line
 --- @param x any
@@ -133,7 +142,7 @@ function M.watch_gitdir(bufnr, gitdir)
 
     dprint(info)
 
-    handler(bufnr)
+    watcher_handler_debounced(bufnr)
   end)
   return w
 end

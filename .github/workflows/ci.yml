@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Check commit messages
-      - uses: webiny/action-conventional-commits@v1.1.0
+      - uses: webiny/action-conventional-commits@v1.3.0
 
   test:
     runs-on: ubuntu-latest
@@ -26,7 +26,7 @@ jobs:
       matrix:
         neovim_branch:
           - 'v0.8.3'
-          - 'v0.9.2'
+          - 'v0.9.5'
           - 'nightly'
 
     env:
@@ -42,11 +42,8 @@ jobs:
 
       - uses: leafo/gh-actions-luarocks@v4
 
-      - name: Download Nvim
-        run: make nvim
-
-      - name: Download Busted
-        run: make busted
+      - name: Download nvim-test
+        run: make nvim-test
 
       - name: Run Test
         run: make test
@@ -69,8 +66,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Download Nvim
-        run: make nvim
+      - uses: leafo/gh-actions-lua@v10
+        with:
+          luaVersion: "5.1.5"
+
+      - uses: leafo/gh-actions-luarocks@v4
+
+      - name: Download nvim-test
+        run: make nvim-test
 
       - name: Doc Check
         run: make doc-check

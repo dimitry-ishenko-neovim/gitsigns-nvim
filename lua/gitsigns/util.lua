@@ -191,16 +191,27 @@ function M.get_relative_time(timestamp)
   end
 end
 
+--- @param xs string[]
+--- @return boolean
+local function is_dos(xs)
+  -- Do not check CR at EOF
+  for i = 1, #xs - 1 do
+    if xs[i]:sub(-1) ~= '\r' then
+      return false
+    end
+  end
+  return true
+end
+
 --- Strip '\r' from the EOL of each line only if all lines end with '\r'
 --- @param xs0 string[]
 --- @return string[]
 function M.strip_cr(xs0)
-  for i = 1, #xs0 do
-    if xs0[i]:sub(-1) ~= '\r' then
-      -- don't strip, return early
-      return xs0
-    end
+  if not is_dos(xs0) then
+    -- don't strip, return early
+    return xs0
   end
+
   -- all lines end with '\r', need to strip
   local xs = vim.deepcopy(xs0)
   for i = 1, #xs do
@@ -333,6 +344,21 @@ function M.list_insert(t, first, last, v)
   -- Fill in new values
   for i = first, last do
     t[i] = v
+  end
+end
+
+--- Run a function once and ignore subsequent calls
+--- @generic F: function
+--- @param fn F
+--- @return F
+function M.once(fn)
+  local called = false
+  return function(...)
+    if called then
+      return
+    end
+    called = true
+    return fn(...)
   end
 end
 

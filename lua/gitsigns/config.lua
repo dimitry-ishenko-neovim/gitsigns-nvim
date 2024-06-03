@@ -1,9 +1,21 @@
+--- @class (exact) Gitsigns.SchemaElem.Deprecated
+---
+--- Used for renaming fields.
+--- @field new_field? string
+---
+--- Documentation for deprecation. Will be added to the help file and used in
+--- the notification if `hard = true`.
+--- @field message? string
+---
+--- Emit a message via vim.notify
+--- @field hard? boolean
+
 --- @class (exact) Gitsigns.SchemaElem
 --- @field type string|string[]
 --- @field refresh? fun(cb: fun()) Function to refresh the config value
 --- @field deep_extend? boolean
 --- @field default any
---- @field deprecated? boolean|{new_field:string,message:string,hard:boolean}
+--- @field deprecated? boolean|Gitsigns.SchemaElem.Deprecated
 --- @field default_help? string
 --- @field description string
 
@@ -38,12 +50,19 @@
 
 --- @alias Gitsigns.CurrentLineBlameFmtFun fun(user: string, info: table<string,any>, opts: Gitsigns.CurrentLineBlameFmtOpts): {[1]:string,[2]:string}[]
 
---- @class (exact) Gitsigns.CurrentLineBlameOpts
---- @field virt_text boolean
---- @field virt_text_pos 'eol'|'overlay'|'right_align'
---- @field delay integer
---- @field ignore_whitespace boolean
---- @field virt_text_priority integer
+--- @class (exact) Gitsigns.CurrentLineBlameOpts : Gitsigns.BlameOpts
+--- @field virt_text? boolean
+--- @field virt_text_pos? 'eol'|'overlay'|'right_align'
+--- @field delay? integer
+--- @field virt_text_priority? integer
+
+--- @class (exact) Gitsigns.BlameOpts
+--- @field ignore_whitespace? boolean
+--- @field rev? string
+--- @field extra_opts? string[]
+
+--- @class (exact) Gitsigns.LineBlameOpts : Gitsigns.BlameOpts
+--- @field full? boolean
 
 --- @class (exact) Gitsigns.Config
 --- @field debug_mode boolean
@@ -70,6 +89,7 @@
 --- @field current_line_blame_formatter_nc string|Gitsigns.CurrentLineBlameFmtFun
 --- @field current_line_blame_opts Gitsigns.CurrentLineBlameOpts
 --- @field preview_config table<string,any>
+--- @field auto_attach boolean
 --- @field attach_to_untracked boolean
 --- @field yadm { enable: boolean }
 --- @field worktrees {toplevel: string, gitdir: string}[]
@@ -562,9 +582,17 @@ M.schema = {
     ]],
   },
 
-  attach_to_untracked = {
+  auto_attach = {
     type = 'boolean',
     default = true,
+    description = [[
+      Automatically attach to files.
+    ]],
+  },
+
+  attach_to_untracked = {
+    type = 'boolean',
+    default = false,
     description = [[
       Attach to untracked files.
     ]],
@@ -617,6 +645,8 @@ M.schema = {
           Ignore whitespace when running blame.
         • virt_text_priority: integer
           Priority of virtual text.
+        • extra_opts: string[]
+          Extra options passed to `git-blame`.
     ]],
   },
 
@@ -742,6 +772,9 @@ M.schema = {
 
   yadm = {
     type = 'table',
+    deprecated = {
+      message = 'Please use |gitsigns-config-on_attach_pre| instead',
+    },
     default = { enable = false },
     description = [[
       yadm configuration.
@@ -813,7 +846,7 @@ M.schema = {
 
   _inline2 = {
     type = 'boolean',
-    default = false,
+    default = true,
     description = [[
       Enable enhanced version of preview_hunk_inline()
     ]],

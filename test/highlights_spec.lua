@@ -1,4 +1,4 @@
-local Screen = require('test.screen')
+local Screen = require('nvim-test.screen')
 local helpers = require('test.gs_helpers')
 
 local clear = helpers.clear
@@ -15,7 +15,7 @@ local setup_gitsigns = helpers.setup_gitsigns
 helpers.env()
 
 describe('highlights', function()
-  local screen
+  local screen --- @type test.screen
   local config
 
   before_each(function()
@@ -23,17 +23,28 @@ describe('highlights', function()
     screen = Screen.new(20, 17)
     screen:attach()
 
-    screen:set_default_attr_ids({
+    local default_attrs = {
       [1] = { foreground = Screen.colors.DarkBlue, background = Screen.colors.WebGray },
-      [2] = { background = Screen.colors.LightMagenta },
+      [2] = { foreground = Screen.colors.NvimDarkCyan },
       [3] = { background = Screen.colors.LightBlue },
-      [4] = { background = Screen.colors.LightCyan1, bold = true, foreground = Screen.colors.Blue1 },
+      [4] = { foreground = Screen.colors.NvimDarkRed },
       [5] = { foreground = Screen.colors.Brown },
       [6] = { foreground = Screen.colors.Blue1, bold = true },
       [7] = { bold = true },
       [8] = { foreground = Screen.colors.White, background = Screen.colors.Red },
       [9] = { foreground = Screen.colors.SeaGreen, bold = true },
-    })
+    }
+
+    -- Use the classic vim colorscheme, not the new defaults in nvim >= 0.10
+    if helpers.fn.has('nvim-0.10') > 0 then
+      command('colorscheme vim')
+    else
+      default_attrs[2] = { background = Screen.colors.LightMagenta }
+      default_attrs[4] =
+        { background = Screen.colors.LightCyan1, bold = true, foreground = Screen.colors.Blue1 }
+    end
+
+    screen:set_default_attr_ids(default_attrs)
 
     -- Make gitisigns available
     exec_lua('package.path = ...', package.path)
@@ -45,6 +56,7 @@ describe('highlights', function()
     cleanup()
     screen:detach()
   end)
+
   it('get set up correctly', function()
     command('set termguicolors')
 
@@ -59,14 +71,16 @@ describe('highlights', function()
 
     setup_gitsigns(config)
 
+    local nvim10 = helpers.fn.has('nvim-0.10') > 0
+
     expectf(function()
       match_dag({
-        p('Deriving GitSignsAdd from DiffAdd'),
+        p('Deriving GitSignsAdd from ' .. (nvim10 and 'Added' or 'DiffAdd')),
         p('Deriving GitSignsAddLn from DiffAdd'),
         p('Deriving GitSignsAddNr from GitSignsAdd'),
         p('Deriving GitSignsChangeLn from DiffChange'),
         p('Deriving GitSignsChangeNr from GitSignsChange'),
-        p('Deriving GitSignsDelete from DiffDelete'),
+        p('Deriving GitSignsDelete from ' .. (nvim10 and 'Removed' or 'DiffDelete')),
         p('Deriving GitSignsDeleteNr from GitSignsDelete'),
       })
     end)

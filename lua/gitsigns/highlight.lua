@@ -5,7 +5,8 @@ local api = vim.api
 --- @field desc string
 --- @field hidden boolean
 --- @field fg_factor number
---- @field bg_factor number
+
+local nvim10 = vim.fn.has('nvim-0.10') > 0
 
 local M = {}
 
@@ -18,7 +19,7 @@ M.hls = {
       'GitGutterAdd',
       'SignifySignAdd',
       'DiffAddedGutter',
-      'diffAdded',
+      nvim10 and 'Added' or 'diffAdded',
       'DiffAdd',
       desc = "Used for the text of 'add' signs.",
     },
@@ -29,7 +30,7 @@ M.hls = {
       'GitGutterChange',
       'SignifySignChange',
       'DiffModifiedGutter',
-      'diffChanged',
+      nvim10 and 'Changed' or 'diffChanged',
       'DiffChange',
       desc = "Used for the text of 'change' signs.",
     },
@@ -40,7 +41,7 @@ M.hls = {
       'GitGutterDelete',
       'SignifySignDelete',
       'DiffRemovedGutter',
-      'diffRemoved',
+      nvim10 and 'Removed' or 'diffRemoved',
       'DiffDelete',
       desc = "Used for the text of 'delete' signs.",
     },
@@ -291,14 +292,13 @@ local function derive(hl, hldef)
   for _, d in ipairs(hldef) do
     if is_hl_set(d) then
       dprintf('Deriving %s from %s', hl, d)
-      if hldef.fg_factor or hldef.bg_factor then
+      if hldef.fg_factor then
         hldef.fg_factor = hldef.fg_factor or 1
-        hldef.bg_factor = hldef.bg_factor or 1
         local dh = get_hl(d)
         api.nvim_set_hl(0, hl, {
           default = true,
           fg = cmul(dh.foreground, hldef.fg_factor),
-          bg = cmul(dh.background, hldef.bg_factor),
+          bg = dh.background,
         })
       else
         api.nvim_set_hl(0, hl, { default = true, link = d })
@@ -306,7 +306,7 @@ local function derive(hl, hldef)
       return
     end
   end
-  if hldef[1] and not hldef.bg_factor and not hldef.fg_factor then
+  if hldef[1] and not hldef.fg_factor then
     -- No fallback found which is set. Just link to the first fallback
     -- if there are no modifiers
     dprintf('Deriving %s from %s', hl, hldef[1])

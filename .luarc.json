@@ -7,6 +7,7 @@
     "library": [
       "lua",
       "$VIMRUNTIME",
+      "nvim-test",
       "${3rd}/busted/library",
       "${3rd}/luassert/library",
       "${3rd}/luv/library"
@@ -14,6 +15,7 @@
     "checkThirdParty": false
   },
   "diagnostics": {
+    "libraryFiles": "Disable",
     "groupFileStatus": {
       "strict": "Opened",
       "strong": "Opened",
