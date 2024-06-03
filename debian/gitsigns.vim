@@ -9,7 +9,7 @@ require("gitsigns").setup({
     untracked    = { text = "┆" },
   },
   on_attach = function(bufnr)
-    local gs = package.loaded.gitsigns
+    local gs = require("gitsigns")
 
     local function map(mode, lhs, rhs, opts)
       opts = opts or {}
@@ -18,16 +18,20 @@ require("gitsigns").setup({
     end
 
     map("n", "]c", function()
-      if vim.wo.diff then return "]c" end
-      vim.schedule(gs.next_hunk)
-      return "<Ignore>"
-    end, { expr = true })
+      if vim.wo.diff then
+        vim.cmd.normal({ "]c", bang = true })
+      else
+        gs.nav_hunk("next")
+      end
+    end)
 
     map("n", "[c", function()
-      if vim.wo.diff then return "[c" end
-      vim.schedule(gs.prev_hunk)
-      return "<Ignore>"
-    end, { expr = true })
+      if vim.wo.diff then
+        vim.cmd.normal({ "[c", bang = true })
+      else
+        gitsigns.nav_hunk("prev")
+      end
+    end)
 
     map("n", "tb", function() gs.blame_line({ full = true }) end)
     map("n", "td", gs.diffthis)
