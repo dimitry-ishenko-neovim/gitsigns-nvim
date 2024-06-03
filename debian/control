@@ -13,7 +13,7 @@ Rules-Requires-Root: no
 
 Package: gitsigns-nvim
 Architecture: all
-Depends: ${misc:Depends}, neovim (>= 0.8.0)
+Depends: ${misc:Depends}, neovim (>= 0.9.0)
 Description: Git integration for neovim
  Super fast git decorations implemented purely in Lua.
  Features:
