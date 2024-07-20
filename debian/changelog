@@ -1,3 +1,9 @@
+gitsigns-nvim (0.8.1-2) unstable; urgency=medium
+
+  * gitsigns.vim: fix [c
+
+ -- Dimitry Ishenko <dimitry.ishenko@gmail.com>  Fri, 19 Jul 2024 23:21:16 -0400
+
 gitsigns-nvim (0.8.1-1) unstable; urgency=medium
 
   * e93a158 feat: update issue templates
