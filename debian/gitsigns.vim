@@ -29,7 +29,7 @@ require("gitsigns").setup({
       if vim.wo.diff then
         vim.cmd.normal({ "[c", bang = true })
       else
-        gitsigns.nav_hunk("prev")
+        gs.nav_hunk("prev")
       end
     end)
 
