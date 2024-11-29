@@ -25,20 +25,12 @@ function M.dirname(file)
 end
 
 --- @param path string
---- @param opts {raw: boolean}?
 --- @return string[]
-function M.file_lines(path, opts)
-  opts = opts or {}
-  local file = assert(io.open(path))
+function M.file_lines(path)
+  local file = assert(io.open(path, 'rb'))
   local contents = file:read('*a')
-  local lines = vim.split(contents, '\n', { plain = true })
-  if not opts.raw then
-    -- If contents ends with a newline, then remove the final empty string after the split
-    if lines[#lines] == '' then
-      lines[#lines] = nil
-    end
-  end
-  return lines
+  file:close()
+  return vim.split(contents, '\n')
 end
 
 M.path_sep = package.config:sub(1, 1)
@@ -124,6 +116,15 @@ function M.buf_rename(bufnr, name)
   delete_alt(bufnr)
 end
 
+--- @param events string[]
+--- @param f fun()
+function M.noautocmd(events, f)
+  local ei = vim.o.eventignore
+  vim.o.eventignore = table.concat(events, ',')
+  f()
+  vim.o.eventignore = ei
+end
+
 --- @param bufnr integer
 --- @param start_row integer
 --- @param end_row integer
@@ -191,6 +192,15 @@ function M.get_relative_time(timestamp)
   end
 end
 
+--- @param opts vim.api.keyset.redraw
+function M.redraw(opts)
+  if vim.fn.has('nvim-0.10') == 1 then
+    vim.api.nvim__redraw(opts)
+  else
+    vim.api.nvim__buf_redraw_range(opts.buf, opts.range[1], opts.range[2])
+  end
+end
+
 --- @param xs string[]
 --- @return boolean
 local function is_dos(xs)
@@ -222,7 +232,10 @@ end
 
 --- @param base? string
 --- @return string?
-function M.calc_base(base)
+function M.norm_base(base)
+  if base == ':0' then
+    return
+  end
   if base and base:sub(1, 1):match('[~\\^]') then
     base = 'HEAD' .. base
   end

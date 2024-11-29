@@ -115,7 +115,7 @@ M.toggle_word_diff = function(value)
     config.word_diff = not config.word_diff
   end
   -- Don't use refresh() to avoid flicker
-  api.nvim__buf_redraw_range(0, vim.fn.line('w0') - 1, vim.fn.line('w$'))
+  util.redraw({ buf = 0, range = { vim.fn.line('w0') - 1, vim.fn.line('w$') } })
   return config.word_diff
 end
 
@@ -1026,7 +1026,10 @@ end
 --- @param bcache Gitsigns.CacheEntry
 --- @param base string?
 local function update_buf_base(bcache, base)
-  bcache.base = base
+  bcache.file_mode = base == 'FILE'
+  if not bcache.file_mode then
+    bcache.git_obj:update_revision(base)
+  end
   bcache:invalidate(true)
   update(bcache.bufnr)
 end
@@ -1064,7 +1067,7 @@ end
 --- @param base string|nil The object/revision to diff against.
 --- @param global boolean|nil Change the base of all buffers.
 M.change_base = async.create(2, function(base, global)
-  base = util.calc_base(base)
+  base = util.norm_base(base)
 
   if global then
     config.base = base
@@ -1254,7 +1257,7 @@ local function buildqflist(target)
         if stat and stat.type == 'file' then
           local a = r:get_show_text(':0:' .. f)
           async.scheduler()
-          local hunks = run_diff(a, util.file_lines(f_abs, { raw = true }))
+          local hunks = run_diff(a, util.file_lines(f_abs))
           hunks_to_qflist(f_abs, hunks, qflist)
         end
       end

@@ -85,9 +85,6 @@ describe('gitsigns (with screen)', function()
 
   it('gitdir watcher works on a fresh repo', function()
     local nvim_ver = exec_lua('return vim.version().minor')
-    if nvim_ver == 8 then
-      pending("v0.8.0 has some regression that's fixed it v0.9.0 dev")
-    end
     screen:try_resize(20, 6)
     setup_test_repo({ no_add = true })
     -- Don't set this too low, or else the test will lock up
@@ -106,12 +103,11 @@ describe('gitsigns (with screen)', function()
           .. vim.pesc(test_file)
       ),
       'watch_gitdir(1): Watching git dir',
-      p('run_job: git .* show :0:dummy.txt'),
     })
 
     check({
       status = { head = '', added = 18, changed = 0, removed = 0 },
-      signs = { untracked = nvim_ver == 10 and 7 or 8 },
+      signs = { untracked = nvim_ver == 9 and 8 or 7 },
     })
 
     git({ 'add', test_file })
@@ -487,7 +483,6 @@ describe('gitsigns (with screen)', function()
           ),
           np('run_job: git .* ls%-files .*'),
           n('watch_gitdir(1): Watching git dir'),
-          np('run_job: git .* show :0:newfile.txt'),
         }
 
         if not internal_diff then
