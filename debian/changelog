@@ -1,3 +1,45 @@
+gitsigns-nvim (0.9.0-1) unstable; urgency=medium
+
+  [ github-actions[bot] ]
+  * chore(main): release 0.9.0
+
+  [ Lewis Russell ]
+  * fix(watcher): throttle watcher handler
+  * chore: add timestamp to debug messages
+  * fix(attach): fix worktree attaching
+
+  [ dundargoc ]
+  * chore: fix typo
+
+  [ Lewis Russell ]
+  * fix(watcher): workaround weird annoying libuv bug
+  * chore: update bug report template
+  * fix: add workaround for Lazy issue
+  * fix(attach): detach on when the buffer name changes
+  * fix: handle untracked files for custom bases
+  * fix: scheduling in cwd watching
+  * feat(setup)!: make setup() synchronous
+  * refactor: remove vimfn signs backend
+  * feat!: drop support for nvim v0.8
+
+  [ Josh Pencheon ]
+  * fix(blame): avoid right-aligned blame overlapping buftext
+
+  [ Lewis Russell ]
+  * fix(update): always get object contents from object names
+  * ci: add testing for Nvim v0.10.0
+
+  [ Yi Ming ]
+  * fix: wrong api name in stable
+  * fix: use latest api in 0.10
+
+  [ Lewis Russell ]
+  * fix(attach): allow attaching inside .git/
+  * fix(util): close file after reading
+  * build: fix release please
+
+ -- Dimitry Ishenko <dimitry.ishenko@gmail.com>  Thu, 28 Nov 2024 21:08:03 -0500
+
 gitsigns-nvim (0.8.1-2) unstable; urgency=medium
 
   * gitsigns.vim: fix [c
