@@ -1,3 +1,229 @@
+gitsigns-nvim (1.0.1-1) unstable; urgency=medium
+
+  [ github-actions[bot] ]
+  * chore(main): release 1.0.1
+
+  [ Lewis Russell ]
+  * fix(current_line_blame): last line show not committed
+  * fix: stylua
+  * fix(blame): fix popup menu shortcut mappings
+  * build: store all deps in deps dir
+  * test: cleanup
+
+  [ github-actions[bot] ]
+  * chore(main): release 1.0.0
+  * ci: update release please (2)
+  * ci: update release please
+  * ci: fix nightly
+  * docs: give README some paint
+
+  [ xzb ]
+  * fix(select_hunk): compatible with <cmd> mapping
+
+  [ Lewis Russell ]
+  * test: update luals
+  * refactor: add flattening of command arguments
+  * fix(repo): make sure --git-dir is always provided --work-tree
+
+  [ dundargoc ]
+  * fix: use non-deprecated versions of vim.validate
+
+  [ Lewis Russell ]
+  * fix(attach): do not attach to fugitive directory buffers
+
+  [ dundargoc ]
+  * docs: fix typos
+
+  [ Lewis Russell ]
+  * fix: partial staging of staged signs
+  * fix(signs): avoid placing signs on lnum 0
+
+  [ dundargoc ]
+  * build: add check.json to .gitignore
+  * ci: point to nvim-test version v1.1.0
+
+  [ Lewis Russell ]
+  * fix: #1187
+  * refactor: diff code
+  * ci: add reporter script for LuaLS
+  * feat(signs): improve sign generation from hunks
+  * fix: #1185 (take 3)
+  * fix: #1185 (take 2)
+  * fix: #1185
+  * fix: #1182 (take 2)
+  * fix: #1182
+  * refactor: attach
+  * refactor: minor improvements to logging
+  * fix: add nil check
+  * docs: fix build badge again
+  * docs: fix README build badge
+  * build: update stylua
+  * fix: GitSignsChanged autocmd for staged hunks
+  * fix: support blame for git < 2.41
+  * fix: fileformat autocmd bug
+  * fix: more EOL fixes
+  * fix: select hunk gets all adjacent linematch hunks
+  * feat!: deprecate some functions
+  * ci: fix luals errors and check in ci
+  * fix: do not show staged signs for different bases
+  * fix(blame): ensure blame object is valid when all lines are
+    requested
+  * docs: generate most highlght defs
+  * fix: do not mix staged signs with normal signs
+  * docs: remove outdated keymap doc
+  * docs: remove gitgutter comparison
+  * fix: revision buffer name parsing for index buffers
+
+  [ ngpong ]
+  * fix: wipeout buf after closing the blame_line/preview_hunk window
+
+  [ Lewis Russell ]
+  * fix: improve support for worktrees in bare repos
+  * refactor: formatting
+  * refactor: update async.lua
+  * ci: resolve failures
+  * fix: reset diff when quiting diff buffer
+  * fix: upstream fixes for system()
+  * docs: update CONTRIBUTING.md
+  * feat: add type annotations for modules
+  * feat: nicer errors for failed stages
+  * chore: update checkout to v4
+
+  [ xzb ]
+  * fix: use norm! to prevent user remapping
+
+  [ Lewis Russell ]
+  * fix: change assert to eprint
+
+  [ Michael Härtl ]
+  * fix: random errors from blame autocommands (#1139)
+
+  [ Antoine ]
+  * fix(blame): show same commit twice or more (#1136)
+
+  [ Lewis Russell ]
+  * fix: string.buffer not found
+
+  [ neeshy ]
+  * fix: handle terminal-only highlights
+
+  [ Péter Szabados ]
+  * fix: diffthis vertical option
+
+  [ Lewis Russell ]
+  * feat: use luajit buffers to serialize thread data
+  * fix: handle repos with no commits
+
+  [ Artem Vasenin ]
+  * docs: update docs
+  * feat(blame_line): add option to show when not focused
+
+  [ Lewis Russell ]
+  * feat: detect repo errors
+
+  [ iofq ]
+  * fix: sort get_nav_hunks to handle mixed hunk states
+
+  [ Lewis Russell ]
+  * feat(async): add async.pcall
+  * feat: add staging and update locks
+
+  [ xzb ]
+  * fix: setqflist("all") should respect change_base
+
+  [ Yi Ming ]
+  * fix(blame): restore original options when blame window is closed
+
+  [ Contsantine Bulany ]
+  * fix(blame)!: replace dot with dash in blame file type name
+
+  [ Lewis Russell ]
+  * feat: add submodule support for gitsigns urls
+  * fix: typo on dprint
+  * fix: wait for buffer to attach in M.show
+
+  [ Dennis B ]
+  * fix: derive Staged*Cul highlight correctly
+
+  [ Anton Rybianov ]
+  * feat: add highlights for the current line
+
+  [ Lewis Russell ]
+  * feat(blame): add reblame at commit parent
+
+  [ MithicSpirit ]
+  * fix: help triggering text autocmds
+
+  [ Lewis Russell ]
+  * fix: add cli binding for show
+  * fix(blame): handle incremental output with a buffered reader
+  * fix: nil check for repo info
+  * fix: add nil check
+  * fix: nil check for repo cache
+  * feat: share Repo objects across buffers
+  * refactor: break up git.lua
+
+  [ belltoy ]
+  * fix(blame): render blame end_col out of range
+
+  [ Lewis Russell ]
+  * fix: lint
+  * refactor: organize imports
+  * refactor(git): remove some code
+  * fix: get the repo version of the username
+
+  [ Daniel Ebrahimian ]
+  * fix(docs): Add signs_staged to default config in README
+
+  [ Lewis Russell ]
+  * fix(watcher): do not ignore any updates
+
+  [ icefed ]
+  * fix(blame): show current buffer line blame immediately
+
+  [ Lewis Russell ]
+  * fix(blame): parse blame info correctly
+  * fix: toggle_current_line_blame
+  * feat(config): improve deprecation message
+
+  [ Artyom Andreev ]
+  * fix(blame): respect original blame winbar
+
+  [ Yi Ming ]
+  * fix(blame): show the winbar if the main window has it enabled
+
+  [ Lewis Russell ]
+  * fix(blame): update current_line_blame when attaching
+  * fix(blame): include error message in error
+  * feat: set bufname for commit buffers
+  * fix(blame): popupmenu error
+  * feat(blame): set filetype to gitsigns.blame
+  * feat(blame): run formatter with pcall
+  * fix(blame): track buffers changes correctly in the cache
+  * refactor(blame): improve color calc
+  * perf(blame): some improvements
+
+  [ Ben Elan ]
+  * fix(attach): resolve error viewing fugitive trees (#1058)
+
+  [ Lewis Russell ]
+  * refactor: simplify deprecated config handling
+  * feat!: remove current_line_blame_formatter_opts
+  * feat!: remove support for yadm
+  * feat(config)!: deprecate highlight groups in config.signs
+  * feat(nav): add target option
+  * fix(nav): misc bugs
+  * chore: update response action
+  * chore: update issue template
+  * fix(util): ignore endofline when running blame
+  * feat(blame): add `Gitsigns blame`
+  * refactor: improve log messages output
+  * fix(watcher): fix debounce
+  * feat: tweak how commit buffers are processed
+  * feat(signs): able staged signs by default
+
+ -- Dimitry Ishenko <dimitry.ishenko@gmail.com>  Fri, 28 Feb 2025 14:25:02 -0500
+
 gitsigns-nvim (0.9.0-1) unstable; urgency=medium
 
   [ github-actions[bot] ]
