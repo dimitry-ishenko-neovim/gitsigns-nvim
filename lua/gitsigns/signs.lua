@@ -39,14 +39,15 @@ end
 
 ---@param bufnr integer
 ---@param signs Gitsigns.Sign[]
-function M:add(bufnr, signs)
+--- @param filter? fun(line: integer):boolean
+function M:add(bufnr, signs, filter)
   if not config.signcolumn and not config.numhl and not config.linehl then
     -- Don't place signs if it won't show anything
     return
   end
 
   for _, s in ipairs(signs) do
-    if not self:contains(bufnr, s.lnum) then
+    if (not filter or filter(s.lnum)) and not self:contains(bufnr, s.lnum) then
       local cs = self.config[s.type]
       local text = cs.text
       if config.signcolumn and cs.show_count and s.count then
@@ -58,13 +59,14 @@ function M:add(bufnr, signs)
 
       local hls = self.hls[s.type]
 
-      local ok, err = pcall(api.nvim_buf_set_extmark, bufnr, self.ns, s.lnum - 1, -1, {
+      local ok, err = pcall(api.nvim_buf_set_extmark, bufnr, self.ns, s.lnum - 1, 0, {
         id = s.lnum,
         sign_text = config.signcolumn and text or '',
         priority = config.sign_priority,
         sign_hl_group = hls.hl,
         number_hl_group = config.numhl and hls.numhl or nil,
         line_hl_group = config.linehl and hls.linehl or nil,
+        cursorline_hl_group = config.culhl and hls.culhl or nil,
       })
 
       if not ok and config.debug_mode then
@@ -88,7 +90,7 @@ function M:contains(bufnr, start, last)
     bufnr,
     self.ns,
     { start - 1, 0 },
-    { last or start, 0 },
+    { last or start - 1, 0 },
     { limit = 1 }
   )
   return #marks > 0
@@ -126,7 +128,7 @@ function M.new(cfg, name)
 
   local self = setmetatable({}, { __index = M })
   self.config = cfg
-  self.hls = name == 'staged' and config._signs_staged or config.signs
+  self.hls = name == 'staged' and config.signs_staged or config.signs
   self.group = 'gitsigns_signs_' .. (name or '')
   self.ns = api.nvim_create_namespace(self.group)
   return self

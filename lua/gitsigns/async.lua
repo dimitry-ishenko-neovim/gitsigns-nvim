@@ -1,111 +1,89 @@
 local M = {}
 
---- @class Gitsigns.Async_T
---- @field _current Gitsigns.Async_T
-local Async_T = {}
+--- @class Gitsigns.AsyncTask
+--- @field _current Gitsigns.AsyncTask
+local Task = {}
 
 -- Handle for an object currently running on the event loop.
 -- The coroutine is paused while this is active.
--- Must provide methods cancel() and is_cancelled()
+-- Must provide methods close() and is_closing()
 --
 -- Handle gets updated on each call to a wrapped functions, so provide access
 -- to it via a proxy
 
--- Coroutine.running() was changed between Lua 5.1 and 5.2:
--- - 5.1: Returns the running coroutine, or nil when called by the main thread.
--- - 5.2: Returns the running coroutine plus a boolean, true when the running
---    coroutine is the main one.
---
--- For LuaJIT, 5.2 behaviour is enabled with LUAJIT_ENABLE_LUA52COMPAT
---
--- We need to handle both.
-
 --- Store all the async threads in a weak table so we don't prevent them from
 --- being garbage collected
---- @type table<thread,Gitsigns.Async_T>
+--- @type table<thread,Gitsigns.AsyncTask>
 local handles = setmetatable({}, { __mode = 'k' })
 
 --- Returns whether the current execution context is async.
-function M.running()
+local function running()
   local current = coroutine.running()
-  if current and handles[current] then
-    return true
-  end
-  return false
+  return current and handles[current] ~= nil
 end
 
+--- @param handle any
+--- @return boolean
 local function is_Async_T(handle)
-  if
-    handle
+  return handle
     and type(handle) == 'table'
-    and vim.is_callable(handle.cancel)
-    and vim.is_callable(handle.is_cancelled)
-  then
-    return true
-  end
+    and vim.is_callable(handle.close)
+    and vim.is_callable(handle.is_closing)
 end
 
 --- Analogous to uv.close
 --- @param cb function
-function Async_T:cancel(cb)
-  -- Cancel anything running on the event loop
-  if self._current and not self._current:is_cancelled() then
-    self._current:cancel(cb)
+function Task:close(cb)
+  -- Close anything running on the event loop
+  if self._current and not self._current:is_closing() then
+    self._current:close(cb)
   end
 end
 
 --- @param co thread
---- @return Gitsigns.Async_T
-function Async_T.new(co)
-  local handle = setmetatable({}, { __index = Async_T })
+--- @return Gitsigns.AsyncTask
+function Task.new(co)
+  local handle = setmetatable({}, { __index = Task })
   handles[co] = handle
   return handle
 end
 
 --- Analogous to uv.is_closing
 --- @return boolean
-function Async_T:is_cancelled()
-  return self._current and self._current:is_cancelled()
+function Task:is_closing()
+  return self._current and self._current:is_closing()
 end
 
 --- @param func function
 --- @param callback? fun(...: any)
 --- @param ... any
---- @return Gitsigns.Async_T
+--- @return Gitsigns.AsyncTask
 local function run(func, callback, ...)
   local co = coroutine.create(func)
-  local handle = Async_T.new(co)
+  local handle = Task.new(co)
 
   local function step(...)
     local ret = { coroutine.resume(co, ...) }
     local stat = ret[1]
 
     if not stat then
-      local err = ret[2] --[[@as string]]
-      error(
-        string.format('The coroutine failed with this message: %s\n%s', err, debug.traceback(co))
-      )
-    end
-
-    if coroutine.status(co) == 'dead' then
+      local co_err = ret[2] --- @type string
+      error(debug.traceback(co, string.format('The async coroutine failed: %s', co_err)))
+    elseif coroutine.status(co) == 'dead' then
       if callback then
         callback(unpack(ret, 2, table.maxn(ret)))
       end
-      return
-    end
+    else
+      --- @type fun(...: any): any
+      local fn = ret[2]
 
-    --- @type integer, fun(...: any): any
-    local nargs, fn = ret[2], ret[3]
+      assert(type(fn) == 'function', 'type error :: expected func')
 
-    assert(type(fn) == 'function', 'type error :: expected func')
-
-    local args = { select(4, unpack(ret)) }
-    args[nargs] = step
-
-    local r = fn(unpack(args, 1, nargs))
-    if is_Async_T(r) then
-      --- @cast r Gitsigns.Async_T
-      handle._current = r
+      local r = fn(step)
+      if is_Async_T(r) then
+        --- @cast r Gitsigns.AsyncTask
+        handle._current = r
+      end
     end
   end
 
@@ -113,45 +91,83 @@ local function run(func, callback, ...)
   return handle
 end
 
+--- Must be called from an async context.
 --- @param argc integer
 --- @param func function
 --- @param ... any
 --- @return any ...
-function M.wait(argc, func, ...)
+function M.await(argc, func, ...)
+  assert(running(), 'Not in an async context')
+  local args, nargs = { ... }, select('#', ...)
+
   -- Always run the wrapped functions in xpcall and re-raise the error in the
   -- coroutine. This makes pcall work as normal.
-  local function pfunc(...)
-    local args = { ... } --- @type any[]
-    local cb = args[argc]
+  local stat, ret = coroutine.yield(function(callback)
     args[argc] = function(...)
-      cb(true, ...)
+      callback(true, { ... })
     end
+    nargs = math.max(nargs, argc)
     xpcall(func, function(err)
-      cb(false, err, debug.traceback())
-    end, unpack(args, 1, argc))
-  end
+      callback(false, { err, debug.traceback() })
+    end, unpack(args, 1, nargs))
+  end)
 
-  local ret = { coroutine.yield(argc, pfunc, ...) }
-
-  local ok = ret[1]
-  if not ok then
+  if not stat then
     --- @type string, string
-    local err, traceback = ret[2], ret[3]
+    local err, traceback = ret[1], ret[2]
     error(string.format('Wrapped function failed: %s\n%s', err, traceback))
   end
 
-  return unpack(ret, 2, table.maxn(ret))
+  return unpack(ret, 1, table.maxn(ret))
+end
+
+--- @param argc integer
+--- @param func function
+--- @param ... any
+--- @return any ...
+function M.wait_sync(argc, func, ...)
+  local nargs, args = select('#', ...), { ... }
+  local done = false
+  local ret = nil
+
+  args[argc] = function(...)
+    ret = { ... }
+    done = true
+  end
+  nargs = math.max(nargs, argc)
+
+  func(unpack(args, 1, nargs))
+
+  vim.wait(10000, function()
+    return done
+  end)
+
+  if not done then
+    error('Timeout waiting for async function')
+  end
+
+  assert(ret)
+  return unpack(ret, 1, table.maxn(ret))
+end
+
+--- @generic R
+--- @param argc integer The number of arguments of func. Must be included.
+--- @param func fun(): R
+--- @param ... any
+--- @return R
+function M.sync(argc, func, ...)
+  return M.wait_sync(argc + 1, M.create(argc, func), ...)
 end
 
 --- Creates an async function with a callback style function.
---- @param argc number The number of arguments of func. Must be included.
+--- @param argc integer The number of arguments of func. Must be included.
 --- @param func function A callback style function to be converted. The last argument must be the callback.
 --- @return function: Returns an async function
-function M.wrap(argc, func)
+function M.awrap(argc, func)
   assert(type(func) == 'function')
   assert(type(argc) == 'number')
   return function(...)
-    return M.wait(argc, func, ...)
+    return M.await(argc, func, ...)
   end
 end
 
@@ -179,15 +195,18 @@ function M.create(argc_or_func, func)
 
   --- @cast func function
 
+  --- @param ... any
+  --- @return any ...
   return function(...)
     local callback = argc and select(argc + 1, ...) or nil
+    assert(not callback or type(callback) == 'function')
     return run(func, callback, unpack({ ... }, 1, argc))
   end
 end
 
 --- An async function that when called will yield to the Neovim scheduler to be
 --- able to call the API.
-M.scheduler = M.wrap(1, vim.schedule)
+M.scheduler = M.awrap(1, vim.schedule)
 
 function M.run(func, ...)
   return run(func, nil, ...)

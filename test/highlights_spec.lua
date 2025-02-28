@@ -16,7 +16,7 @@ helpers.env()
 
 describe('highlights', function()
   local screen --- @type test.screen
-  local config
+  local config --- @type Gitsigns.Config
 
   before_each(function()
     clear()
@@ -46,9 +46,6 @@ describe('highlights', function()
 
     screen:set_default_attr_ids(default_attrs)
 
-    -- Make gitisigns available
-    exec_lua('package.path = ...', package.path)
-    exec_lua('gs = require("gitsigns")')
     config = vim.deepcopy(test_config)
   end)
 
@@ -84,15 +81,6 @@ describe('highlights', function()
         p('Deriving GitSignsDeleteNr from GitSignsDelete'),
       })
     end)
-
-    -- eq('GitSignsChange xxx links to DiffChange',
-    -- exec_capture('hi GitSignsChange'))
-
-    -- eq('GitSignsDelete xxx links to DiffDelete',
-    -- exec_capture('hi GitSignsDelete'))
-
-    -- eq('GitSignsAdd    xxx links to DiffAdd',
-    -- exec_capture('hi GitSignsAdd'))
   end)
 
   it('update when colorscheme changes', function()
@@ -106,35 +94,5 @@ describe('highlights', function()
     config.linehl = true
 
     setup_gitsigns(config)
-
-    -- expectf(function()
-    --   eq('GitSignsChange xxx links to DiffChange',
-    --     exec_capture('hi GitSignsChange'))
-
-    --   eq('GitSignsDelete xxx links to DiffDelete',
-    --     exec_capture('hi GitSignsDelete'))
-
-    --   eq('GitSignsAdd    xxx links to DiffAdd',
-    --     exec_capture('hi GitSignsAdd'))
-
-    --   eq('GitSignsAddLn  xxx links to DiffAdd',
-    --     exec_capture('hi GitSignsAddLn'))
-    -- end)
-
-    -- command('colorscheme blue')
-
-    -- expectf(function()
-    --   eq('GitSignsChange xxx links to DiffChange',
-    --     exec_capture('hi GitSignsChange'))
-
-    --   eq('GitSignsDelete xxx links to DiffDelete',
-    --     exec_capture('hi GitSignsDelete'))
-
-    --   eq('GitSignsAdd    xxx links to DiffAdd',
-    --     exec_capture('hi GitSignsAdd'))
-
-    --   eq('GitSignsAddLn  xxx links to DiffAdd',
-    --     exec_capture('hi GitSignsAddLn'))
-    -- end)
   end)
 end)

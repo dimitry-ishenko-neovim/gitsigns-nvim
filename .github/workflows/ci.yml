@@ -39,7 +39,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - uses: leafo/gh-actions-lua@v9
         with:
@@ -53,11 +53,11 @@ jobs:
       - name: Run Test
         run: make test
 
-  lint:
+  stylua:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Download stylua
         run: make stylua
@@ -65,11 +65,32 @@ jobs:
       - name: Lint
         run: make stylua-check
 
+  luals:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: leafo/gh-actions-lua@v9
+        with:
+          luaVersion: "5.1.5"
+
+      - uses: leafo/gh-actions-luarocks@v4
+
+      - name: Download nvim-test
+        run: make nvim-test
+
+      - name: Download LuaLS
+        run: make luals
+
+      - name: Lint
+        run: make luals-check
+
   doc:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - uses: leafo/gh-actions-lua@v10
         with:

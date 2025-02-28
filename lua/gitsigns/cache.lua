@@ -20,11 +20,20 @@ local M = {
 --- @field gitdir_watcher?    uv.uv_fs_event_t
 --- @field git_obj            Gitsigns.GitObj
 --- @field blame?             table<integer,Gitsigns.BlameInfo?>
+---
+--- @field update_lock?       true Update in progress
 local CacheEntry = M.CacheEntry
 
-function CacheEntry:get_rev_bufname(rev)
+function CacheEntry:get_rev_bufname(rev, nofile)
   rev = rev or self.git_obj.revision or ':0'
-  return string.format('gitsigns://%s/%s:%s', self.git_obj.repo.gitdir, rev, self.git_obj.relpath)
+  if nofile then
+    return string.format('gitsigns://%s//%s', self.git_obj.repo.gitdir, rev)
+  end
+  return string.format('gitsigns://%s//%s:%s', self.git_obj.repo.gitdir, rev, self.git_obj.relpath)
+end
+
+function CacheEntry:locked()
+  return self.git_obj.lock or self.update_lock or false
 end
 
 --- Invalidate any state dependent on the buffer content.
@@ -49,10 +58,11 @@ function M.new(o)
   return setmetatable(o, { __index = CacheEntry })
 end
 
-local sleep = async.wrap(2, function(duration, cb)
+local sleep = async.awrap(2, function(duration, cb)
   vim.defer_fn(cb, duration)
 end)
 
+--- @async
 --- @private
 function CacheEntry:wait_for_hunks()
   local loop_protect = 0
@@ -65,71 +75,94 @@ end
 -- If a file contains has up to this amount of lines, then
 -- always blame the whole file, otherwise only blame one line
 -- at a time.
-local BLAME_THRESHOLD_LEN = 1000000
+local BLAME_THRESHOLD_LEN = 10000
 
+--- @async
 --- @private
---- @param lnum integer
---- @param opts Gitsigns.BlameOpts
---- @return table<integer,Gitsigns.BlameInfo?>?
+--- @param lnum? integer
+--- @param opts? Gitsigns.BlameOpts
+--- @return table<integer,Gitsigns.BlameInfo?>
+--- @return boolean? full
 function CacheEntry:run_blame(lnum, opts)
   local bufnr = self.bufnr
-  local blame_cache --- @type table<integer,Gitsigns.BlameInfo?>?
-  repeat
-    local buftext = util.buf_lines(bufnr)
+
+  -- Always send contents if buffer represents an editable file on disk.
+  -- Otherwise do not sent contents buffer revision is from tree and git version
+  -- is below 2.41.
+  --
+  -- This avoids the error:
+  --   "fatal: cannot use --contents with final commit object name"
+  local send_contents = vim.bo[bufnr].buftype == ''
+    or (not self.git_obj:from_tree() and not require('gitsigns.git.version').check(2, 41))
+
+  while true do
+    local contents = send_contents and util.buf_lines(bufnr) or nil
     local tick = vim.b[bufnr].changedtick
-    local lnum0 = #buftext > BLAME_THRESHOLD_LEN and lnum or nil
+    local lnum0 = vim.api.nvim_buf_line_count(bufnr) > BLAME_THRESHOLD_LEN and lnum or nil
     -- TODO(lewis6991): Cancel blame on changedtick
-    blame_cache = self.git_obj:run_blame(buftext, lnum0, opts)
+    local blame = self.git_obj:run_blame(contents, lnum0, self.git_obj.revision, opts)
     async.scheduler()
     if not vim.api.nvim_buf_is_valid(bufnr) then
-      return
+      return {}
     end
-  until vim.b[bufnr].changedtick == tick
-  return blame_cache
+    if vim.b[bufnr].changedtick == tick then
+      return blame, lnum0 == nil
+    end
+  end
 end
 
---- @param file string
---- @param lnum integer
---- @return Gitsigns.BlameInfo
-local function get_blame_nc(file, lnum)
-  local Git = require('gitsigns.git')
+--- @private
+--- @param lnum? integer
+--- @return boolean
+function CacheEntry:blame_valid(lnum)
+  local blame = self.blame
+  if not blame then
+    return false
+  end
 
-  return {
-    orig_lnum = 0,
-    final_lnum = lnum,
-    commit = Git.not_committed(file),
-    filename = file,
-  }
+  if lnum then
+    return blame[lnum] ~= nil
+  end
+
+  -- Need to check we have blame info for all lines
+  for i = 1, vim.api.nvim_buf_line_count(self.bufnr) do
+    if not blame[i] then
+      return false
+    end
+  end
+
+  return true
 end
 
---- @param lnum integer
---- @param opts Gitsigns.BlameOpts
+--- If lnum is nil then run blame for the entire buffer.
+--- @async
+--- @param lnum? integer
+--- @param opts? Gitsigns.BlameOpts
 --- @return Gitsigns.BlameInfo?
 function CacheEntry:get_blame(lnum, opts)
-  if opts.rev then
-    local buftext = util.buf_lines(self.bufnr)
-    return self.git_obj:run_blame(buftext, lnum, opts)[lnum]
-  end
+  local blame = self.blame
 
-  local blame_cache = self.blame
-
-  if not blame_cache or not blame_cache[lnum] then
+  if not blame or not self:blame_valid(lnum) then
     self:wait_for_hunks()
+    blame = blame or {}
     local Hunks = require('gitsigns.hunks')
-    if Hunks.find_hunk(lnum, self.hunks) then
+    if lnum and Hunks.find_hunk(lnum, self.hunks) then
       --- Bypass running blame (which can be expensive) if we know lnum is in a hunk
-      blame_cache = blame_cache or {}
-      blame_cache[lnum] = get_blame_nc(self.git_obj.relpath, lnum)
+      local Blame = require('gitsigns.git.blame')
+      blame[lnum] = Blame.get_blame_nc(self.git_obj.relpath, lnum)
     else
-      -- Refresh cache
-      blame_cache = self:run_blame(lnum, opts)
+      -- Refresh/update cache
+      local b, full = self:run_blame(lnum, opts)
+      if lnum and not full then
+        blame[lnum] = b[lnum]
+      else
+        blame = b
+      end
     end
-    self.blame = blame_cache
+    self.blame = blame
   end
 
-  if blame_cache then
-    return blame_cache[lnum]
-  end
+  return blame[lnum]
 end
 
 function CacheEntry:destroy()
@@ -137,9 +170,10 @@ function CacheEntry:destroy()
   if w and not w:is_closing() then
     w:close()
   end
+  self.git_obj.repo:unref()
 end
 
----@type table<integer,Gitsigns.CacheEntry>
+---@type table<integer,Gitsigns.CacheEntry?>
 M.cache = {}
 
 --- @param bufnr integer

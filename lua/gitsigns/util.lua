@@ -133,9 +133,13 @@ function M.set_lines(bufnr, start_row, end_row, lines)
   if vim.bo[bufnr].fileformat == 'dos' then
     lines = M.strip_cr(lines)
   end
-  if start_row == 0 and end_row == -1 and lines[#lines] == '' then
-    lines = vim.deepcopy(lines)
-    lines[#lines] = nil
+  if start_row == 0 and end_row == -1 then
+    if lines[#lines] == '' then
+      lines = vim.deepcopy(lines)
+      lines[#lines] = nil
+    else
+      vim.bo[bufnr].eol = false
+    end
   end
   vim.api.nvim_buf_set_lines(bufnr, start_row, end_row, false, lines)
 end
@@ -263,9 +267,8 @@ end
 
 ---@param fmt string
 ---@param info table<string,any>
----@param reltime? boolean Use relative time as the default date format
 ---@return string
-function M.expand_format(fmt, info, reltime)
+function M.expand_format(fmt, info)
   local ret = {} --- @type string[]
 
   for _ = 1, 20 do -- loop protection
@@ -286,7 +289,7 @@ function M.expand_format(fmt, info, reltime)
       end
       if vim.endswith(key, '_time') then
         if time_fmt == '' then
-          time_fmt = reltime and '%R' or '%Y-%m-%d'
+          time_fmt = '%Y-%m-%d'
         end
         v = expand_date(time_fmt, v)
       end
@@ -327,7 +330,7 @@ end
 ---@param first integer
 ---@param last integer
 function M.list_remove(t, first, last)
-  local n = #t
+  local n = table.maxn(t)
   for i = 0, n - first do
     t[first + i] = t[last + 1 + i]
     t[last + 1 + i] = nil
@@ -347,7 +350,7 @@ end
 ---@param last integer
 ---@param v any
 function M.list_insert(t, first, last, v)
-  local n = #t
+  local n = table.maxn(t)
 
   -- Shift table forward
   for i = n - first, 0, -1 do

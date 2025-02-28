@@ -11,7 +11,6 @@ local buf_get_var = helpers.api.nvim_buf_get_var
 local system = helpers.fn.system
 
 M.scratch = os.getenv('PJ_ROOT') .. '/scratch'
-M.gitdir = M.scratch .. '/.git'
 M.test_file = M.scratch .. '/dummy.txt'
 M.newfile = M.scratch .. '/newfile.txt'
 
@@ -60,49 +59,36 @@ local test_file_text = {
 }
 
 --- Run a git command
-function M.gitf(args)
-  system({ 'git', '-C', M.scratch, unpack(args) })
-end
-
---- @param cmds string[][]
-function M.gitm(cmds)
-  for _, cmd in ipairs(cmds) do
-    M.gitf(cmd)
-  end
-  helpers.sleep(10)
-end
-
---- Run a git command and add a delay
-function M.git(args)
-  M.gitf(args)
-  helpers.sleep(10)
+--- @param ... string
+function M.git(...)
+  system({ 'git', '-C', M.scratch, ... })
 end
 
 function M.cleanup()
   system({ 'rm', '-rf', M.scratch })
 end
 
-function M.setup_git()
-  M.gitf({ 'init', '-b', 'master' })
+function M.git_init()
+  M.git('init', '-b', 'main')
 
   -- Always force color to test settings don't interfere with gitsigns systems
   -- commands (addresses #23)
-  M.gitf({ 'config', 'color.branch', 'always' })
-  M.gitf({ 'config', 'color.ui', 'always' })
-  M.gitf({ 'config', 'color.diff', 'always' })
-  M.gitf({ 'config', 'color.interactive', 'always' })
-  M.gitf({ 'config', 'color.status', 'always' })
-  M.gitf({ 'config', 'color.grep', 'always' })
-  M.gitf({ 'config', 'color.pager', 'true' })
-  M.gitf({ 'config', 'color.decorate', 'always' })
-  M.gitf({ 'config', 'color.showbranch', 'always' })
+  M.git('config', 'color.branch', 'always')
+  M.git('config', 'color.ui', 'always')
+  M.git('config', 'color.diff', 'always')
+  M.git('config', 'color.interactive', 'always')
+  M.git('config', 'color.status', 'always')
+  M.git('config', 'color.grep', 'always')
+  M.git('config', 'color.pager', 'true')
+  M.git('config', 'color.decorate', 'always')
+  M.git('config', 'color.showbranch', 'always')
 
-  M.gitf({ 'config', 'merge.conflictStyle', 'merge' })
+  M.git('config', 'merge.conflictStyle', 'merge')
 
-  M.gitf({ 'config', 'user.email', 'tester@com.com' })
-  M.gitf({ 'config', 'user.name', 'tester' })
+  M.git('config', 'user.email', 'tester@com.com')
+  M.git('config', 'user.name', 'tester')
 
-  M.gitf({ 'config', 'init.defaultBranch', 'master' })
+  M.git('config', 'init.defaultBranch', 'main')
 end
 
 --- Setup a basic git repository in directory `helpers.scratch` with a single file
@@ -112,14 +98,13 @@ function M.setup_test_repo(opts)
   local text = opts and opts.test_file_text or test_file_text
   M.cleanup()
   system({ 'mkdir', M.scratch })
-  M.setup_git()
+  M.git_init()
   system({ 'touch', M.test_file })
   M.write_to_file(M.test_file, text)
   if not (opts and opts.no_add) then
-    M.gitf({ 'add', M.test_file })
-    M.gitf({ 'commit', '-m', 'init commit' })
+    M.git('add', M.test_file)
+    M.git('commit', '-m', 'init commit')
   end
-  helpers.sleep(20)
 end
 
 --- @param cond fun()
@@ -128,6 +113,7 @@ function M.expectf(cond, interval)
   local duration = 0
   interval = interval or 1
   while duration < timeout do
+    --- @type boolean, boolean?
     local ok, ret = pcall(cond)
     if ok and (ret == nil or ret == true) then
       return
@@ -139,6 +125,7 @@ function M.expectf(cond, interval)
   cond()
 end
 
+--- @param path string
 function M.edit(path)
   helpers.api.nvim_command('edit ' .. path)
 end
@@ -182,9 +169,6 @@ end
 function M.match_lines(lines, spec)
   local i = 1
   for _, line in ipairs(lines) do
-    -- Remove leading timestamp
-    line = line:gsub('^%[[0-9.]+%] ', '')
-
     local s = spec[i]
     if line ~= '' and s and match_spec_elem(line, s) then
       i = i + 1
@@ -193,13 +177,17 @@ function M.match_lines(lines, spec)
 
   if i < #spec + 1 then
     local unmatched_msg = table.concat(
+      --- @param v any
+      --- @return string
       vim.tbl_map(function(v)
-        return string.format('    - %s', v.text or v)
+        return ('    - %s'):format(v.text or v)
       end, spec),
       '\n'
     )
 
     local lines_msg = table.concat(
+      --- @param v any
+      --- @return string
       vim.tbl_map(function(v)
         return string.format('    - %s', v)
       end, lines),
@@ -224,7 +212,13 @@ end
 
 --- @return string[]
 function M.debug_messages()
-  return exec_lua("return require'gitsigns.debug.log'.messages")
+  --- @type string[]
+  local r = exec_lua("return require'gitsigns.debug.log'.get()")
+  for i, line in ipairs(r) do
+    -- Remove leading timestamp
+    r[i] = line:gsub('^[0-9.]+ D ', '')
+  end
+  return r
 end
 
 --- Like match_debug_messages but elements in spec are unordered
@@ -245,57 +239,61 @@ function M.match_debug_messages(spec)
   end)
 end
 
+--- @param config? table
+--- @param on_attach? boolean
 function M.setup_gitsigns(config, on_attach)
-  exec_lua(
-    [[
-      local config, on_attach = ...
-      if config and config.on_attach then
-        local maps = config.on_attach
-        config.on_attach = function(bufnr)
-          for _, map in ipairs(maps) do
-            vim.keymap.set(map[1], map[2], map[3], {buffer = bufnr})
-          end
+  exec_lua(function(path, config0, on_attach0)
+    package.path = path
+    if config0 and config0.on_attach then
+      local maps = config0.on_attach --[[@as [string,string,string][] ]]
+      config0.on_attach = function(bufnr)
+        for _, map in ipairs(maps) do
+          vim.keymap.set(map[1], map[2], map[3], { buffer = bufnr })
         end
       end
-      if on_attach then
-        config.on_attach = function()
-          return false
-        end
+    end
+    if on_attach0 then
+      config0.on_attach = function()
+        return false
       end
-      require('gitsigns').setup(config)
-    ]],
-    config,
-    on_attach
-  )
+    end
+    require('gitsigns').setup(config0)
+    vim.o.diffopt = 'internal,filler,closeoff'
+  end, package.path, config, on_attach)
 end
 
 --- @param status table<string,string|integer>
-local function check_status(status)
-  local fn = helpers.fn
+--- @param bufnr integer
+local function check_status(status, bufnr)
   if next(status) == nil then
-    eq(0, fn.exists('b:gitsigns_head'), 'b:gitsigns_head is unexpectedly set')
-    eq(0, fn.exists('b:gitsigns_status_dict'), 'b:gitsigns_status_dict is unexpectedly set')
-  else
-    eq(1, fn.exists('b:gitsigns_head'), 'b:gitsigns_head is not set')
-    eq(status.head, buf_get_var(0, 'gitsigns_head'), 'b:gitsigns_head does not match')
+    eq(false, pcall(buf_get_var, bufnr, 'gitsigns_head'), 'b:gitsigns_head is unexpectedly set')
+    eq(
+      false,
+      pcall(buf_get_var, bufnr, 'gitsigns_status_dict'),
+      'b:gitsigns_status_dict is unexpectedly set'
+    )
+    return
+  end
 
-    --- @type table<string,string|integer>
-    local bstatus = buf_get_var(0, 'gitsigns_status_dict')
+  eq(status.head, buf_get_var(bufnr, 'gitsigns_head'), 'b:gitsigns_head does not match')
 
-    for _, i in ipairs({ 'added', 'changed', 'removed', 'head' }) do
-      eq(status[i], bstatus[i], string.format("status['%s'] did not match gitsigns_status_dict", i))
-    end
-    -- Catch any extra keys
-    for i, v in pairs(status) do
-      eq(v, bstatus[i], string.format("status['%s'] did not match gitsigns_status_dict", i))
-    end
+  --- @type table<string,string|integer>
+  local bstatus = buf_get_var(bufnr, 'gitsigns_status_dict')
+
+  for _, i in ipairs({ 'added', 'changed', 'removed', 'head' }) do
+    eq(status[i], bstatus[i], string.format("status['%s'] did not match gitsigns_status_dict", i))
+  end
+  -- Catch any extra keys
+  for i, v in pairs(status) do
+    eq(v, bstatus[i], string.format("status['%s'] did not match gitsigns_status_dict", i))
   end
 end
 
 --- @param signs table<string,integer>
-local function check_signs(signs)
+--- @param bufnr integer
+local function check_signs(signs, bufnr)
   local buf_signs = {} --- @type string[]
-  local buf_marks = helpers.api.nvim_buf_get_extmarks(0, -1, 0, -1, { details = true })
+  local buf_marks = helpers.api.nvim_buf_get_extmarks(bufnr, -1, 0, -1, { details = true })
   for _, s in ipairs(buf_marks) do
     buf_signs[#buf_signs + 1] = s[4].sign_hl_group
   end
@@ -322,24 +320,22 @@ local function check_signs(signs)
 end
 
 --- @param attrs {signs:table<string,integer>,status:table<string,string|integer>}
---- @param interval? integer
-function M.check(attrs, interval)
+--- @param bufnr? integer
+function M.check(attrs, bufnr)
+  bufnr = bufnr or 0
   if not attrs then
     return
   end
 
-  local status = attrs.status
-  local signs = attrs.signs
-
   M.expectf(function()
-    if status then
-      check_status(status)
+    if attrs.status then
+      check_status(attrs.status, bufnr)
     end
 
-    if signs then
-      check_signs(signs)
+    if attrs.signs then
+      check_signs(attrs.signs, bufnr)
     end
-  end, interval)
+  end)
 end
 
 return M

@@ -1,6 +1,6 @@
-local M = {}
-
 local api = vim.api
+
+local M = {}
 
 --- @param bufnr integer
 --- @param lines string[]
@@ -144,6 +144,8 @@ local function create_buf(lines, highlights)
   local ts = vim.bo.tabstop
   local bufnr = api.nvim_create_buf(false, true)
   assert(bufnr, 'Failed to create buffer')
+
+  vim.bo[bufnr].bufhidden = 'wipe'
 
   -- In case nvim was opened with '-M'
   vim.bo[bufnr].modifiable = true

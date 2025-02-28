@@ -7,22 +7,13 @@ local startswith = vim.startswith
 
 local config = require('lua.gitsigns.config')
 
---- @param path string
---- @return string
-local function read_file(path)
-  local f = assert(io.open(path, 'r'))
-  local t = f:read('*all')
-  f:close()
-  return t
-end
-
 -- To make sure the output is consistent between runs (to minimise diffs), we
 -- need to iterate through the schema keys in a deterministic way. To do this we
 -- do a smple scan over the file the schema is defined in and collect the keys
 -- in the order they are defined.
 --- @return string[]
 local function get_ordered_schema_keys()
-  local ci = read_file('lua/gitsigns/config.lua'):gmatch('[^\n\r]+')
+  local ci = io.lines('lua/gitsigns/config.lua') --- @type Iterator[string]
 
   for l in ci do
     if startswith(l, 'M.schema = {') then
@@ -48,9 +39,9 @@ end
 --- @param out fun(_: string?)
 local function gen_config_doc_deprecated(dep_info, out)
   if type(dep_info) == 'table' and dep_info.hard then
-    out('   HARD-DEPRECATED')
+    out('      HARD-DEPRECATED')
   else
-    out('   DEPRECATED')
+    out('      DEPRECATED')
   end
   if type(dep_info) == 'table' then
     if dep_info.message then
@@ -101,10 +92,10 @@ local function gen_config_doc_field(field, out)
     end
 
     local vtype = (function()
-      if v.type == 'table' and v.deep_extend then
+      local ty = v.type_help or v.type
+      if ty == 'table' and v.deep_extend then
         return 'table[extended]'
       end
-      local ty = v.type
       if type(ty) == 'table' then
         v.type = table.concat(ty, '|')
       end
@@ -356,7 +347,7 @@ end
 --- @param path string
 --- @return string
 local function gen_functions_doc_from_file(path)
-  local i = read_file(path):gmatch('([^\n]*)\n?') --- @type Iterator[string]
+  local i = io.lines(path) --- @type Iterator[string]
 
   local blocks = {} --- @type string[][]
 
@@ -434,6 +425,9 @@ local function gen_highlights_doc()
           fallbacks_tbl[#fallbacks_tbl + 1] = string.format('`%s`', f)
         end
         local fallbacks = table.concat(fallbacks_tbl, ', ')
+        if spec.fg_factor then
+          fallbacks = fallbacks .. (' (fg=%d%%)'):format(spec.fg_factor * 100)
+        end
         res[#res + 1] = string.format('%s*hl-%s*', string.rep(' ', 56), name)
         res[#res + 1] = string.format('%s', name)
         if spec.desc then
@@ -450,7 +444,7 @@ end
 
 --- @return string
 local function get_setup_from_readme()
-  local readme = read_file('README.md'):gmatch('([^\n]*)\n?') --- @type Iterator
+  local readme = io.lines('README.md') --- @type Iterator[string]
   local res = {} --- @type string[]
 
   local function append(line)
@@ -478,7 +472,7 @@ end
 --- @return string|fun():string
 local function get_marker_text(marker)
   return ({
-    VERSION = 'v0.9.0', -- x-release-please-version
+    VERSION = 'v1.0.1', -- x-release-please-version
     CONFIG = gen_config_doc,
     FUNCTIONS = function()
       return gen_functions_doc({
@@ -493,7 +487,7 @@ local function get_marker_text(marker)
 end
 
 local function main()
-  local template = read_file('etc/doc_template.txt'):gmatch('([^\n]*)\n?') --- @type Iterator
+  local template = io.lines('etc/doc_template.txt') --- @type Iterator[string]
 
   local out = assert(io.open('doc/gitsigns.txt', 'w'))
 

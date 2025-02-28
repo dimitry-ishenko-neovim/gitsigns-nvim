@@ -1,19 +1,20 @@
 local async = require('gitsigns.async')
 local log = require('gitsigns.debug.log')
+local Config = require('gitsigns.config')
 
-local gs_config = require('gitsigns.config')
-local config = gs_config.config
+local config = Config.config
 
 local api = vim.api
 local uv = vim.uv or vim.loop
 
+--- @class gitsigns.main
 local M = {}
 
 local cwd_watcher ---@type uv.uv_fs_event_t?
 
 --- @async
---- @return string gitdir
---- @return string head
+--- @return string? gitdir
+--- @return string? head
 local function get_gitdir_and_head()
   local cwd = assert(uv.cwd())
 
@@ -29,9 +30,11 @@ local function get_gitdir_and_head()
     end
   end
 
-  local info = require('gitsigns.git').get_repo_info(cwd)
+  local info = require('gitsigns.git').Repo.get_info(cwd)
 
-  return info.gitdir, info.abbrev_head
+  if info then
+    return info.gitdir, info.abbrev_head
+  end
 end
 
 local update_cwd_head = async.create(function()
@@ -89,7 +92,7 @@ local update_cwd_head = async.create(function()
     100,
     async.create(function()
       local git = require('gitsigns.git')
-      local new_head = git.get_repo_info(cwd).abbrev_head
+      local new_head = git.Repo.get_info(cwd).abbrev_head
       async.scheduler()
       vim.g.gitsigns_head = new_head
     end)
@@ -123,11 +126,6 @@ local function setup_cli()
       return require('gitsigns.cli').complete(arglead, line)
     end,
   })
-end
-
-local function setup_debug()
-  log.debug_mode = config.debug_mode
-  log.verbose = config._verbose
 end
 
 --- @async
@@ -204,7 +202,7 @@ end
 --- @param cfg table|nil Configuration for Gitsigns.
 ---     See |gitsigns-usage| for more details.
 function M.setup(cfg)
-  gs_config.build(cfg)
+  Config.build(cfg)
 
   if vim.fn.executable('git') == 0 then
     print('gitsigns: git not in path. Aborting setup')
@@ -213,14 +211,15 @@ function M.setup(cfg)
 
   api.nvim_create_augroup('gitsigns', {})
 
-  setup_debug()
+  log.setup(config)
   setup_cli()
   require('gitsigns.highlight').setup()
   setup_attach()
   setup_cwd_head()
 end
 
-return setmetatable(M, {
+--- @type gitsigns.main|gitsigns.actions|gitsigns.attach|gitsigns.debug
+M = setmetatable(M, {
   __index = function(_, f)
     local attach = require('gitsigns.attach')
     if attach[f] then
@@ -240,3 +239,5 @@ return setmetatable(M, {
     end
   end,
 })
+
+return M

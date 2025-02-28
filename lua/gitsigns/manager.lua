@@ -1,22 +1,15 @@
 local async = require('gitsigns.async')
-
-local gs_cache = require('gitsigns.cache')
-local cache = gs_cache.cache
-
+local log = require('gitsigns.debug.log')
+local util = require('gitsigns.util')
+local run_diff = require('gitsigns.diff')
+local Hunks = require('gitsigns.hunks')
 local Signs = require('gitsigns.signs')
 local Status = require('gitsigns.status')
 
 local debounce_trailing = require('gitsigns.debounce').debounce_trailing
 local throttle_by_id = require('gitsigns.debounce').throttle_by_id
 
-local log = require('gitsigns.debug.log')
-local dprint = log.dprint
-
-local util = require('gitsigns.util')
-local run_diff = require('gitsigns.diff')
-
-local gs_hunks = require('gitsigns.hunks')
-
+local cache = require('gitsigns.cache').cache
 local config = require('gitsigns.config').config
 
 local api = vim.api
@@ -31,16 +24,17 @@ local M = {}
 --- @param hunks Gitsigns.Hunk.Hunk[]
 --- @param top integer
 --- @param bot integer
---- @param clear boolean
+--- @param clear? boolean
 --- @param untracked boolean
-local function apply_win_signs0(bufnr, signs, hunks, top, bot, clear, untracked)
+--- @param filter? fun(line: integer):boolean
+local function apply_win_signs0(bufnr, signs, hunks, top, bot, clear, untracked, filter)
   if clear then
     signs:remove(bufnr) -- Remove all signs
   end
 
   for i, hunk in ipairs(hunks or {}) do
-    --- @type Gitsigns.Hunk.Hunk?
-    local next = hunks[i + 1]
+    --- @type Gitsigns.Hunk.Hunk?, Gitsigns.Hunk.Hunk?
+    local prev_hunk, next_hunk = hunks[i - 1], hunks[i + 1]
 
     -- To stop the sign column width changing too much, if there are signs to be
     -- added but none of them are visible in the window, then make sure to add at
@@ -49,13 +43,12 @@ local function apply_win_signs0(bufnr, signs, hunks, top, bot, clear, untracked)
     if clear and i == 1 then
       signs:add(
         bufnr,
-        gs_hunks.calc_signs(hunk, next, hunk.added.start, hunk.added.start, untracked)
+        Hunks.calc_signs(prev_hunk, hunk, next_hunk, hunk.added.start, hunk.added.start, untracked),
+        filter
       )
     end
 
-    if top <= hunk.vend and bot >= hunk.added.start then
-      signs:add(bufnr, gs_hunks.calc_signs(hunk, next, top, bot, untracked))
-    end
+    signs:add(bufnr, Hunks.calc_signs(prev_hunk, hunk, next_hunk, top, bot, untracked), filter)
     if hunk.added.start > bot then
       break
     end
@@ -65,17 +58,24 @@ end
 --- @param bufnr integer
 --- @param top integer
 --- @param bot integer
---- @param clear boolean
+--- @param clear? boolean
 local function apply_win_signs(bufnr, top, bot, clear)
-  local bcache = cache[bufnr]
-  if not bcache then
-    return
-  end
-
+  local bcache = assert(cache[bufnr])
   local untracked = bcache.git_obj.object_name == nil
   apply_win_signs0(bufnr, signs_normal, bcache.hunks, top, bot, clear, untracked)
   if signs_staged then
-    apply_win_signs0(bufnr, signs_staged, bcache.hunks_staged, top, bot, clear, false)
+    apply_win_signs0(
+      bufnr,
+      signs_staged,
+      bcache.hunks_staged,
+      top,
+      bot,
+      clear,
+      false,
+      function(lnum)
+        return not signs_normal:contains(bufnr, lnum)
+      end
+    )
   end
 end
 
@@ -88,15 +88,13 @@ local function on_lines_blame(blame, first, last_orig, last_new)
     return
   end
 
-  if last_new ~= last_orig then
-    if last_new < last_orig then
-      util.list_remove(blame, last_new, last_orig)
-    else
-      util.list_insert(blame, last_orig, last_new)
-    end
+  if last_new < last_orig then
+    util.list_remove(blame, last_new + 1, last_orig)
+  elseif last_new > last_orig then
+    util.list_insert(blame, last_orig + 1, last_new)
   end
 
-  for i = math.min(first + 1, last_new), math.max(first + 1, last_new) do
+  for i = first + 1, last_new do
     blame[i] = nil
   end
 end
@@ -109,7 +107,7 @@ end
 function M.on_lines(buf, first, last_orig, last_new)
   local bcache = cache[buf]
   if not bcache then
-    dprint('Cache for buffer was nil. Detaching')
+    log.dprint('Cache for buffer was nil. Detaching')
     return true
   end
 
@@ -161,7 +159,7 @@ local function apply_word_diff(bufnr, row)
 
   local lnum = row + 1
 
-  local hunk = gs_hunks.find_hunk(lnum, bcache.hunks)
+  local hunk = Hunks.find_hunk(lnum, bcache.hunks)
   if not hunk then
     -- No hunk at line
     return
@@ -320,7 +318,7 @@ function M.show_deleted_in_float(bufnr, nsd, hunk, staged)
     virt_lines_leftcol = true,
   })
 
-  local bcache = cache[bufnr]
+  local bcache = assert(cache[bufnr])
   local pbufnr = api.nvim_create_buf(false, true)
   local text = staged and bcache.compare_text_head or bcache.compare_text
   api.nvim_buf_set_lines(pbufnr, 0, -1, false, assert(text))
@@ -345,11 +343,11 @@ function M.show_deleted_in_float(bufnr, nsd, hunk, staged)
 
   api.nvim_win_call(pwinid, function()
     -- Expand folds
-    vim.cmd('normal ' .. 'zR')
+    vim.cmd('normal! ' .. 'zR')
 
     -- Navigate to hunk
-    vim.cmd('normal ' .. tostring(hunk.removed.start) .. 'gg')
-    vim.cmd('normal ' .. vim.api.nvim_replace_termcodes('z<CR>', true, false, true))
+    vim.cmd('normal! ' .. tostring(hunk.removed.start) .. 'gg')
+    vim.cmd('normal! ' .. vim.api.nvim_replace_termcodes('z<CR>', true, false, true))
   end)
 
   local last_lnum = api.nvim_buf_line_count(bufnr)
@@ -422,7 +420,7 @@ end
 
 --- @param bufnr integer
 local function update_show_deleted(bufnr)
-  local bcache = cache[bufnr]
+  local bcache = assert(cache[bufnr])
 
   clear_deleted(bufnr)
   if config.show_deleted then
@@ -440,20 +438,21 @@ end
 function M.schedule(bufnr, check_compare_text)
   async.scheduler()
   if not api.nvim_buf_is_valid(bufnr) then
-    dprint('Buffer not valid, aborting')
+    log.dprint('Buffer not valid, aborting')
     return false
   end
   if not cache[bufnr] then
-    dprint('Has detached, aborting')
+    log.dprint('Has detached, aborting')
     return false
   end
   if check_compare_text and not cache[bufnr].compare_text then
-    dprint('compare_text was invalid, aborting')
+    log.dprint('compare_text was invalid, aborting')
     return false
   end
   return true
 end
 
+--- @async
 --- Ensure updates cannot be interleaved.
 --- Since updates are asynchronous we need to make sure an update isn't performed
 --- whilst another one is in progress. If this happens then schedule another
@@ -463,7 +462,9 @@ M.update = throttle_by_id(function(bufnr)
   if not M.schedule(bufnr) then
     return
   end
-  local bcache = cache[bufnr]
+  local bcache = assert(cache[bufnr])
+  bcache.update_lock = true
+
   local old_hunks, old_hunks_staged = bcache.hunks, bcache.hunks_staged
   bcache.hunks, bcache.hunks_staged = nil, nil
 
@@ -488,9 +489,25 @@ M.update = throttle_by_id(function(bufnr)
     return
   end
 
-  if config._signs_staged_enable and not file_mode and not git_obj.revision then
+  local bufname = api.nvim_buf_get_name(bufnr)
+  local rev_is_index = not git_obj:from_tree()
+
+  if
+    config.signs_staged_enable
+    and not file_mode
+    and (rev_is_index or bufname:match('^fugitive://') or bufname:match('^gitsigns://'))
+  then
     if not bcache.compare_text_head or config._refresh_staged_on_update then
-      bcache.compare_text_head = git_obj:get_show_text('HEAD')
+      -- When the revision is from the index, we compare against HEAD to
+      -- show the staged changes.
+      --
+      -- When showing a revision buffer (a buffer that represents the revision
+      -- of a specific file and does not have a corresponding file on disk), we
+      -- utilize the staged signs to represent the changes introduced in that
+      -- revision. Therefore we compare against the previous commit. Note there
+      -- should not be any normal signs for these buffers.
+      local staged_rev = rev_is_index and 'HEAD' or git_obj.revision .. '^'
+      bcache.compare_text_head = git_obj:get_show_text(staged_rev)
       if not M.schedule(bufnr, true) then
         return
       end
@@ -499,15 +516,15 @@ M.update = throttle_by_id(function(bufnr)
     if not M.schedule(bufnr) then
       return
     end
-    bcache.hunks_staged = gs_hunks.filter_common(hunks_head, bcache.hunks)
+    bcache.hunks_staged = Hunks.filter_common(hunks_head, bcache.hunks)
   end
 
   -- Note the decoration provider may have invalidated bcache.hunks at this
   -- point
   if
     bcache.force_next_update
-    or gs_hunks.compare_heads(bcache.hunks, old_hunks)
-    or gs_hunks.compare_heads(bcache.hunks_staged, old_hunks_staged)
+    or Hunks.compare_heads(bcache.hunks, old_hunks)
+    or Hunks.compare_heads(bcache.hunks_staged, old_hunks_staged)
   then
     -- Apply signs to the window. Other signs will be added by the decoration
     -- provider as they are drawn.
@@ -516,10 +533,11 @@ M.update = throttle_by_id(function(bufnr)
     update_show_deleted(bufnr)
     bcache.force_next_update = false
 
-    local summary = gs_hunks.get_summary(bcache.hunks)
+    local summary = Hunks.get_summary(bcache.hunks)
     summary.head = git_obj.repo.abbrev_head
     Status:update(bufnr, summary)
   end
+  bcache.update_lock = nil
 end, true)
 
 --- @param bufnr integer
@@ -557,7 +575,7 @@ local function on_win(_cb, _winid, bufnr, topline, botline_guess)
   end
   local botline = math.min(botline_guess, api.nvim_buf_line_count(bufnr))
 
-  apply_win_signs(bufnr, topline + 1, botline + 1, false)
+  apply_win_signs(bufnr, topline + 1, botline + 1)
 
   if not (config.word_diff and config.diff_opts.internal) then
     return false
@@ -581,8 +599,8 @@ function M.setup()
   })
 
   signs_normal = Signs.new(config.signs)
-  if config._signs_staged_enable then
-    signs_staged = Signs.new(config._signs_staged, 'staged')
+  if config.signs_staged_enable then
+    signs_staged = Signs.new(config.signs_staged, 'staged')
   end
 
   M.update_debounced = debounce_trailing(config.update_debounce, async.create(1, M.update))
