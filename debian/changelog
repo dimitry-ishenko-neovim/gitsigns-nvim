@@ -1,3 +1,10 @@
+gitsigns-nvim (1.0.1-2) unstable; urgency=medium
+
+  * gitsigns.vim: fix highlight for staged chunks
+  * Not using gbp
+
+ -- Dimitry Ishenko <dimitry.ishenko@gmail.com>  Sat, 01 Mar 2025 22:56:01 -0500
+
 gitsigns-nvim (1.0.1-1) unstable; urgency=medium
 
   [ github-actions[bot] ]
