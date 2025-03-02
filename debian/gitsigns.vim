@@ -54,6 +54,10 @@ highlight GitSignsAdd    ctermfg=darkgreen
 highlight GitSignsChange ctermfg=darkyellow
 highlight GitSignsDelete ctermfg=darkred
 
+highlight! link GitSignsStagedAdd    LineNr
+highlight! link GitSignsStagedChange LineNr
+highlight! link GitSignsStagedDelete LineNr
+
 highlight GitSignsAddInline    ctermbg=green
 highlight GitSignsChangeInline ctermbg=yellow
 highlight GitSignsDeleteInline ctermbg=red
