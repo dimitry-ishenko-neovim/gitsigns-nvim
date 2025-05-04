@@ -1,3 +1,23 @@
+gitsigns-nvim (1.0.2-1) unstable; urgency=medium
+
+  [ github-actions[bot] ]
+  * chore(main): release 1.0.2
+
+  [ phanium ]
+  * fix: `stage_hunk` on staged hunk should behave like
+    `undo_stage_hunk`
+
+  [ Lewis Russell ]
+  * ci: update luals
+  * refactor: move preview code to module
+  * refactor: use tuple syntax for LuaCATS
+  * fix: change_base with empty base
+  * chore: fix #1223
+  * chore: fix type errors found by emmylua_ls
+  * refactor: update async lib
+
+ -- Dimitry Ishenko <dimitry.ishenko@gmail.com>  Sun, 04 May 2025 14:07:16 -0400
+
 gitsigns-nvim (1.0.1-2) unstable; urgency=medium
 
   * gitsigns.vim: fix highlight for staged chunks
