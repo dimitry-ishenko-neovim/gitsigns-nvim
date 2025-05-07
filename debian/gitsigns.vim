@@ -1,12 +1,19 @@
 lua << EOF
 require("gitsigns").setup({
   signs = {
-    add          = { text = "┃" },
-    change       = { text = "┃" },
+    add          = { text = "│" },
+    change       = { text = "│" },
     delete       = { text = "╽" },
     topdelete    = { text = "╿" },
-    changedelete = { text = "┃" },
+    changedelete = { text = "│" },
     untracked    = { text = "┆" },
+  },
+  signs_staged = {
+    add          = { text = "│" },
+    change       = { text = "│" },
+    delete       = { text = "╽" },
+    topdelete    = { text = "╿" },
+    changedelete = { text = "│" },
   },
   on_attach = function(bufnr)
     local gs = require("gitsigns")
@@ -54,9 +61,9 @@ highlight GitSignsAdd    ctermfg=darkgreen
 highlight GitSignsChange ctermfg=darkyellow
 highlight GitSignsDelete ctermfg=darkred
 
-highlight! link GitSignsStagedAdd    LineNr
-highlight! link GitSignsStagedChange LineNr
-highlight! link GitSignsStagedDelete LineNr
+highlight GitSignsStagedAdd    ctermfg=grey
+highlight GitSignsStagedChange ctermfg=grey
+highlight GitSignsStagedDelete ctermfg=grey
 
 highlight GitSignsAddInline    ctermbg=green
 highlight GitSignsChangeInline ctermbg=yellow
