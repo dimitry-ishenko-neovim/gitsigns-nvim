@@ -1,3 +1,9 @@
+gitsigns-nvim (1.0.2-2) unstable; urgency=medium
+
+  * gitsigns.vim: show staged hunks, better integration
+
+ -- Dimitry Ishenko <dimitry.ishenko@gmail.com>  Tue, 06 May 2025 23:59:01 -0400
+
 gitsigns-nvim (1.0.2-1) unstable; urgency=medium
 
   [ github-actions[bot] ]
