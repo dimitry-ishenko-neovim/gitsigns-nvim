@@ -1,3 +1,143 @@
+gitsigns-nvim (2.0.0-1) unstable; urgency=medium
+
+  [ Dimitry Ishenko ]
+  * d/copyright: update
+  * d/control: compat level 13
+  * gitsigns.vim => gitsigns.lua
+  * Merge tag 'v2.0.0'
+
+  [ github-actions[bot] ]
+  * chore(main): release 2.0.0
+
+  [ Lewis Russell ]
+  * refactor: move blame_line() logic to module
+  * feat(blame): do not show hunk if it was added in commit
+  * feat: add basic gh integration
+  * fix(attach): do not attach to files in resolved gitdir
+
+  [ Jiàn ]
+  * fix: calculate staged color dynamically adjust based on background
+
+  [ Shaobo Song ]
+  * fix: all toggle actions didn't refresh highlight in non-active
+    buffers
+
+  [ ohainle ]
+  * fix(show): handle numeric branch name
+
+  [ Lewis Russell ]
+  * fix: remove clear_env=true for system calls
+  * fix: tests for nightly
+  * feat: set buffer name for blame window
+
+  [ Pi-Yueh Chuang ]
+  * fix 1347
+
+  [ phanium ]
+  * fix: when diff dos format with unix format
+
+  [ 0xzhzh ]
+  * fix(blame): do not unpack hunk linespec
+
+  [ Lewis Russell ]
+  * chore: fix .github config
+  * chore: disable blank issues
+  * chore: remove gitter links
+  * fix: type errors from emmylua
+  * ci: switch to lua actions fork
+  * fix: type errors from emmylua
+
+  [ phanium ]
+  * fix: preview_hunk format
+
+  [ Lewis Russell ]
+  * fix: check cwd before running rev-parse
+  * fix(blame): do no expand hunk text
+  * fix(blame): handle bad git-blame output
+
+  [ przepompownia ]
+  * fix(types): add on_attach return type
+
+  [ Lewis Russell ]
+  * fix: do not attach if buffer is a directory
+
+  [ Marc Jakobi ]
+  * ci: bump luarocks-tag-release action
+
+  [ Lewis Russell ]
+  * chore: sync changes from async.nvim
+
+  [ Yuanjing Hong ]
+  * fix: check preview popup before navigating
+
+  [ bhagwan ]
+  * fix: errors nil ref
+
+  [ Lewis Russell ]
+  * fix: #1312
+  * fix: attach through symlinks
+  * refactor: use vim.fs.dirname
+  * fix: type fixes
+  * Revert "fix: emmylua fixes"
+  * fix: emmylua fixes
+  * fix: #1307
+  * feat(config)!: remove support for custom highlight names
+  * fix: #1300
+  * fix: handle files outside of repo
+  * chore: remove noise from the git commands in debug messages
+  * fix: react to config changes more robustly
+  * chore: update issue template
+  * fix: handle when files are removed from index
+  * feat(setup)!: make optional
+  * fix(blame): handle partial lines in blame output
+  * feat(diffthis): add some rename detection
+  * fix(preview): set border to none for inline preview
+  * chore: typo
+
+  [ phanium ]
+  * fix: nvim<0.11 has no `&winborder`
+
+  [ Lewis Russell ]
+  * fix: #1277
+  * fix: respect winborder when creating popups
+  * fix: remove border from docs
+  * feat: remove border from preview_config default
+  * fix: #1280
+
+  [ dmxk062 ]
+  * fix(error): #1277
+
+  [ Lewis Russell ]
+  * fix(windows): #1250
+  * fix(async): raise errors when they happen
+  * fix: #1274
+  * fix: correct hl group
+
+  [ phanium ]
+  * fix: blame_line{full=true} stop work
+
+  [ Lewis Russell ]
+  * refactor: emmylua fixes (2)
+  * refactor: emmylua fixes
+
+  [ Cameron Ring ]
+  * fix: tracking multiple branch changes (#1266)
+
+  [ Xyven ]
+  * fix: prevent inline hunk preview from folding
+
+  [ Lewis Russell ]
+  * fix(watcher): invalidate the cache earlier
+
+  [ dundargoc ]
+  * build: fix makefile target name
+
+  [ Lewis Russell ]
+  * fix: #1246
+  * ci!: target Nvim 0.11, drop testing for 0.9.5
+
+ -- Dimitry Ishenko <dimitry.ishenko@gmail.com>  Sat, 05 Jul 2025 16:12:15 -0400
+
 gitsigns-nvim (1.0.2-2) unstable; urgency=medium
 
   * gitsigns.vim: show staged hunks, better integration
