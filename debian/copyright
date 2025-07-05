@@ -4,9 +4,9 @@ Upstream-Name: gitsigns.nvim
 Upstream-Contact: Lewis Russel <me@lewisr.dev>
 
 Files: *
-Copyright: 2023 Lewis Russel <me@lewisr.dev>
-License: MIT
+Copyright: 2020, Lewis Russell
+License: Expat
 
 Files: debian/*
-Copyright: 2023 Dimitry Ishenko <dimitry.ishenko@gmail.com>
-License: GPL-3.0+
+Copyright: 2023-2025, Dimitry Ishenko <dimitry.ishenko@gmail.com>
+License: GPL-2+
