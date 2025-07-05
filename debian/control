@@ -3,9 +3,9 @@ Section: editors
 Priority: optional
 Maintainer: Dimitry Ishenko <dimitry.ishenko@gmail.com>
 Build-Depends:
- debhelper-compat (= 12),
- dh-vim-addon
-Standards-Version: 4.6.0
+ debhelper-compat (= 13),
+ dh-vim-addon,
+Standards-Version: 4.6.2
 Homepage: https://github.com/lewis6991/gitsigns.nvim
 Vcs-Browser: https://github.com/dimitry-ishenko-vim/gitsigns-nvim
 Vcs-Git: https://github.com/dimitry-ishenko-vim/gitsigns-nvim.git
@@ -13,7 +13,9 @@ Rules-Requires-Root: no
 
 Package: gitsigns-nvim
 Architecture: all
-Depends: ${misc:Depends}, neovim (>= 0.9.0)
+Depends:
+ ${misc:Depends},
+ neovim (>= 0.9.0),
 Description: Git integration for neovim
  Super fast git decorations implemented purely in Lua.
  Features:
