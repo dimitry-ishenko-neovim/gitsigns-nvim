@@ -1,2 +1,2 @@
 doc lua usr/share/gitsigns-nvim
-debian/gitsigns.vim etc/skel/.config/nvim/plugin
+debian/gitsigns.lua etc/skel/.config/nvim/plugin
