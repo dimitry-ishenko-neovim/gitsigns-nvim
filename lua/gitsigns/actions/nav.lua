@@ -106,7 +106,7 @@ function M.nav_hunk(direction, opts)
     return
   end
 
-  local line = api.nvim_win_get_cursor(0)[1]
+  local line = api.nvim_win_get_cursor(0)[1] --[[@as integer]]
   local index --- @type integer?
 
   local forwards = direction == 'next' or direction == 'last'
@@ -119,12 +119,16 @@ function M.nav_hunk(direction, opts)
         api.nvim_echo({ { 'No more hunks', 'WarningMsg' } }, false, {})
       end
       local _, col = vim.fn.getline(line):find('^%s*')
+      --- @cast col -?
       api.nvim_win_set_cursor(0, { line, col })
       return
     end
-
-    line = forwards and hunks[index].added.start or hunks[index].vend
+    local hunk = assert(hunks[index])
+    line = forwards and hunk.added.start or hunk.vend
   end
+
+  -- Check if preview popup is open before moving the cursor
+  local should_preview = opts.preview or Popup.is_open('hunk') ~= nil
 
   -- Handle topdelete
   line = math.max(line, 1)
@@ -132,6 +136,7 @@ function M.nav_hunk(direction, opts)
   vim.cmd([[ normal! m' ]]) -- add current cursor position to the jump list
 
   local _, col = vim.fn.getline(line):find('^%s*')
+  --- @cast col -?
   api.nvim_win_set_cursor(0, { line, col })
 
   if opts.foldopen then
@@ -142,9 +147,9 @@ function M.nav_hunk(direction, opts)
   -- appear in the old position
   async.schedule()
 
-  local Preview = require('gitsigns.preview')
+  local Preview = require('gitsigns.actions.preview')
 
-  if opts.preview or Popup.is_open('hunk') ~= nil then
+  if should_preview then
     -- Close the popup in case one is open which will cause it to focus the
     -- popup
     Popup.close('hunk')

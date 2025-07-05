@@ -3,7 +3,6 @@
 [![CI](https://github.com/lewis6991/gitsigns.nvim/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/lewis6991/gitsigns.nvim/actions?query=workflow%3ACI)
 [![Version](https://img.shields.io/github/v/release/lewis6991/gitsigns.nvim)](https://github.com/lewis6991/gitsigns.nvim/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Gitter](https://badges.gitter.im/gitsigns-nvim/community.svg)](https://gitter.im/gitsigns-nvim/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 [![Dotfyle](https://dotfyle.com/plugins/lewis6991/gitsigns.nvim/shield)](https://dotfyle.com/plugins/lewis6991/gitsigns.nvim)
 
 
@@ -148,15 +147,10 @@ Deep buffer integration for Git
 
 ## 🛠️ Installation & Usage
 
-Install using your package manager of choice.
+Install using your package manager of choice. No setup required.
 
-For recommended setup with all batteries included:
-```lua
-require('gitsigns').setup()
-```
-
-Configuration can be passed to the setup function. Here is an example with most of
-the default settings:
+Optional configuration can be passed to the setup function. Here is an example
+with most of the default settings:
 
 ```lua
 require('gitsigns').setup {
@@ -202,7 +196,6 @@ require('gitsigns').setup {
   max_file_length = 40000, -- Disable if file is longer than this (in lines)
   preview_config = {
     -- Options passed to nvim_open_win
-    border = 'single',
     style = 'minimal',
     relative = 'cursor',
     row = 0,
@@ -280,7 +273,6 @@ require('gitsigns').setup{
 
     -- Toggles
     map('n', '<leader>tb', gitsigns.toggle_current_line_blame)
-    map('n', '<leader>td', gitsigns.toggle_deleted)
     map('n', '<leader>tw', gitsigns.toggle_word_diff)
 
     -- Text object

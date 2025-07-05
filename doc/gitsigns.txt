@@ -2,7 +2,7 @@
 *gitsigns.nvim*
 
 Author:   Lewis Russell <lewis6991@gmail.com>
-Version:  v1.0.2
+Version:  v2.0.0
 Homepage: <https://github.com/lewis6991/gitsigns.nvim>
 License:  MIT license
 
@@ -25,13 +25,10 @@ file IO.
 ==============================================================================
 USAGE                                                         *gitsigns-usage*
 
-For basic setup with all batteries included:
+No setup required.
 >lua
-    require('gitsigns').setup()
-<
-
-Configuration can be passed to the setup function. Here is an example with most
-of the default settings:
+Optional configuration can be passed to the setup function. Here is an example
+with most of the default settings:
 >lua
     require('gitsigns').setup {
       signs = {
@@ -76,7 +73,6 @@ of the default settings:
       max_file_length = 40000, -- Disable if file is longer than this (in lines)
       preview_config = {
         -- Options passed to nvim_open_win
-        border = 'single',
         style = 'minimal',
         relative = 'cursor',
         row = 0,
@@ -168,7 +164,7 @@ setloclist({nr}, {target})                             *gitsigns.setloclist()*
                 Parameters: ~
                     {nr?}    (integer): Window number or the |window-ID|.
                              `0` for the current window (default).
-                    {target} (integer|string): See |gitsigns.setqflist()|.
+                    {target} (integer|'attached'|'all'|nil): See |gitsigns.setqflist()|.
 
 setqflist({target}, {opts}, {callback?})                *gitsigns.setqflist()*
                 Populate the quickfix list with hunks. Automatically opens the
@@ -178,7 +174,7 @@ setqflist({target}, {opts}, {callback?})                *gitsigns.setqflist()*
                     {async}
 
                 Parameters: ~
-                    {target} (integer|string):
+                    {target} (integer|'attached'|'all'|nil):
                              Specifies which files hunks are collected from.
                              Possible values.
                              • [integer]: The buffer with the matching buffer
@@ -219,6 +215,10 @@ show({revision}, {callback})                                 *gitsigns.show()*
 
                 Attributes: ~
                     {async}
+
+                Parameters: ~
+                    {revision}  (string?):
+                    {callback?} (fun()):
 
 diffthis({base}, {opts})                                 *gitsigns.diffthis()*
                 Perform a |vimdiff| on the given file with {base} if it is
@@ -610,7 +610,7 @@ signs_staged_enable                      *gitsigns-config-signs_staged_enable*
     When enabled the signs defined in |git-config-signs_staged|` are used.
 
 worktrees                                          *gitsigns-config-worktrees*
-      Type: `table`, Default: `nil`
+      Type: `table`, Default: `{}`
 
       Detached working trees.
 
@@ -796,7 +796,6 @@ preview_config                                *gitsigns-config-preview_config*
       Type: `table[extended]`
       Default: >
         `{
-          border = "single",
           col = 1,
           relative = "cursor",
           row = 0,
@@ -952,6 +951,12 @@ trouble                                              *gitsigns-config-trouble*
 
       When using setqflist() or setloclist(), open Trouble instead of the
       quickfix/location list window.
+
+gh                                                        *gitsigns-config-gh*
+      Type: `boolean`, Default: `false`
+
+      Enable GitHub integration. This allows the following features:
+      • `:Gitsigns blame_line` will show PR numbers (with a hyperlink)
 
 word_diff                                          *gitsigns-config-word_diff*
       Type: `boolean`, Default: `false`

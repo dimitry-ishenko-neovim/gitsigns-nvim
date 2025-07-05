@@ -106,7 +106,7 @@ local function create_revision_buf(bufnr, base)
       group = 'gitsigns',
       buffer = dbuf,
       callback = function()
-        async.arun(bufread, bufnr, dbuf, base)
+        async.arun(bufread, bufnr, dbuf, base):raise_on_error()
       end,
     })
 
@@ -114,7 +114,7 @@ local function create_revision_buf(bufnr, base)
       group = 'gitsigns',
       buffer = dbuf,
       callback = function()
-        async.arun(bufwrite, bufnr, dbuf, base)
+        async.arun(bufwrite, bufnr, dbuf, base):raise_on_error()
       end,
     })
   else
@@ -203,7 +203,7 @@ M.diffthis = async.create(2, function(base, opts, _callback)
 end)
 
 --- @param bufnr integer
---- @param base string
+--- @param base string?
 --- @param _callback? fun()
 M.show = async.create(2, function(bufnr, base, _callback)
   __FUNC__ = 'show'
@@ -229,6 +229,7 @@ M.show = async.create(2, function(bufnr, base, _callback)
   end
 end)
 
+--- @async
 --- @param bufnr integer
 --- @return boolean
 local function should_reload(bufnr)
@@ -248,7 +249,7 @@ end
 --- @return boolean
 local function is_fugitive_diff_window(name)
   return vim.startswith(name, 'fugitive://')
-    and vim.fn.exists('*FugitiveParse')
+    and vim.fn.exists('*FugitiveParse') == 1
     and vim.fn.FugitiveParse(name)[1] ~= ':'
 end
 

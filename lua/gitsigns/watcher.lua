@@ -1,5 +1,5 @@
 local api = vim.api
-local uv = vim.loop
+local uv = vim.uv or vim.loop ---@diagnostic disable-line: deprecated
 
 local async = require('gitsigns.async')
 local log = require('gitsigns.debug.log')
@@ -14,20 +14,22 @@ local debounce_trailing = require('gitsigns.debounce').debounce_trailing
 local dprint = log.dprint
 local dprintf = log.dprintf
 
+--- @async
 --- @param bufnr integer
 --- @param old_relpath? string
 local function handle_moved(bufnr, old_relpath)
   local bcache = assert(cache[bufnr])
   local git_obj = bcache.git_obj
 
-  git_obj.orig_relpath = assert(git_obj.orig_relpath or old_relpath)
-  local new_name = git_obj.repo:rename_status()[git_obj.orig_relpath]
+  local orig_relpath = assert(git_obj.orig_relpath or old_relpath)
+  git_obj.orig_relpath = orig_relpath
+  local new_name = git_obj.repo:rename_status()[orig_relpath]
   if new_name then
     dprintf('File moved to %s', new_name)
     git_obj.relpath = new_name
     git_obj.file = git_obj.repo.toplevel .. '/' .. new_name
   elseif git_obj.orig_relpath then
-    local orig_file = git_obj.repo.toplevel .. util.path_sep .. git_obj.orig_relpath
+    local orig_file = util.Path.join(git_obj.repo.toplevel, git_obj.orig_relpath)
     if not git_obj.repo:file_info(orig_file, git_obj.revision) then
       return
     end
@@ -40,7 +42,7 @@ local function handle_moved(bufnr, old_relpath)
     return
   end
 
-  git_obj.file = git_obj.repo.toplevel .. util.path_sep .. git_obj.relpath
+  git_obj.file = util.Path.join(git_obj.repo.toplevel, git_obj.relpath)
   bcache.file = git_obj.file
   git_obj:refresh()
   if not bcache:schedule() then
@@ -94,6 +96,7 @@ local function watcher_handler0(bufnr)
   local was_tracked = git_obj.object_name ~= nil
   local old_relpath = git_obj.relpath
 
+  bcache:invalidate(true)
   git_obj:refresh()
   if not bcache:schedule() then
     dprint('buffer invalid (3)')
@@ -109,8 +112,6 @@ local function watcher_handler0(bufnr)
       return
     end
   end
-
-  cache[bufnr]:invalidate(true)
 
   require('gitsigns.manager').update(bufnr)
 end

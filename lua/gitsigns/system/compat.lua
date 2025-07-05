@@ -1,4 +1,4 @@
-local uv = vim.uv or vim.loop
+local uv = vim.uv or vim.loop ---@diagnostic disable-line: deprecated
 
 --- @type vim.SystemSig
 local SIG = {
@@ -31,7 +31,7 @@ end
 
 --- @param signal integer|string
 function SystemObj:kill(signal)
-  self._state.handle:kill(signal)
+  assert(self._state.handle):kill(signal)
 end
 
 --- @package
@@ -61,7 +61,7 @@ function SystemObj:wait(timeout)
     end, nil, true)
   end
 
-  return state.result
+  return assert(state.result)
 end
 
 --- @param data string[]|string|nil
@@ -187,16 +187,31 @@ local function setup_env(env, clear_env)
   return renv
 end
 
+local is_win = vim.fn.has('win32') == 1
+
 --- @param cmd string
 --- @param opts uv.spawn.options
 --- @param on_exit fun(code: integer, signal: integer)
 --- @param on_error fun()
 --- @return uv.uv_process_t, integer
 local function spawn(cmd, opts, on_exit, on_error)
+  if is_win then
+    local cmd1 = vim.fn.exepath(cmd)
+    if cmd1 ~= '' then
+      cmd = cmd1
+    end
+  end
+
   local handle, pid_or_err = uv.spawn(cmd, opts, on_exit)
   if not handle then
     on_error()
-    error(pid_or_err)
+    if opts.cwd and not uv.fs_stat(opts.cwd) then
+      error(("%s (cwd): '%s'"):format(pid_or_err, opts.cwd))
+    elseif vim.fn.executable(cmd) == 0 then
+      error(("%s (cmd): '%s'"):format(pid_or_err, cmd))
+    else
+      error(pid_or_err)
+    end
   end
   return handle, pid_or_err --[[@as integer]]
 end
@@ -275,7 +290,6 @@ end
 --- @param on_exit? fun(out: vim.SystemCompleted)
 --- @return vim.SystemObj
 local function system(cmd, opts, on_exit)
-  local __FUNC__ = 'run_job'
   vim.validate({
     cmd = { cmd, 'table' },
     opts = { opts, 'table', true },
@@ -284,8 +298,8 @@ local function system(cmd, opts, on_exit)
 
   opts = opts or {}
 
-  local stdout, stdout_handler, stdout_data = setup_output(opts.stdout)
-  local stderr, stderr_handler, stderr_data = setup_output(opts.stderr)
+  local stdout, stdout_handler, stdout_data = setup_output(opts.stdout, opts.text)
+  local stderr, stderr_handler, stderr_data = setup_output(opts.stderr, opts.text)
   local stdin, towrite = setup_input(opts.stdin)
 
   --- @type vim.SystemState
@@ -301,7 +315,7 @@ local function system(cmd, opts, on_exit)
   }
 
   --- @diagnostic disable-next-line:missing-fields
-  state.handle, state.pid = spawn(cmd[1], {
+  state.handle, state.pid = spawn(assert(cmd[1]), {
     args = vim.list_slice(cmd, 2),
     stdio = { stdin, stdout, stderr },
     cwd = opts.cwd,

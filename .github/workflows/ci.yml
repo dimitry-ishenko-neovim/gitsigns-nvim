@@ -30,8 +30,8 @@ jobs:
 
       matrix:
         neovim_branch:
-          - 'v0.9.5'
-          - 'v0.10.0'
+          - 'v0.10.4'
+          - 'v0.11.0'
           - 'nightly'
 
     env:
@@ -41,7 +41,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - uses: leafo/gh-actions-lua@v9
+      - uses: lewis6991/gh-actions-lua@master
         with:
           luaVersion: "5.1.5"
 
@@ -71,7 +71,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - uses: leafo/gh-actions-lua@v9
+      - uses: lewis6991/gh-actions-lua@master
         with:
           luaVersion: "5.1.5"
 
@@ -92,7 +92,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - uses: leafo/gh-actions-lua@v10
+      - uses: lewis6991/gh-actions-lua@master
         with:
           luaVersion: "5.1.5"
 

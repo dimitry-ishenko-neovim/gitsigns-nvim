@@ -1,7 +1,8 @@
-local uv = vim.uv or vim.loop
+local uv = vim.uv or vim.loop ---@diagnostic disable-line: deprecated
 
 local error_once = require('gitsigns.message').error_once
 local log = require('gitsigns.debug.log')
+local util = require('gitsigns.util')
 
 --- @class Gitsigns.CommitInfo
 --- @field author string
@@ -75,7 +76,7 @@ end
 ---@param x any
 ---@return integer
 local function asinteger(x)
-  return assert(tonumber(x))
+  return assert(util.tointeger(x))
 end
 
 --- @param readline fun(): string?
@@ -84,21 +85,23 @@ end
 local function incremental_iter(readline, commits, result)
   local line = assert(readline())
 
-  --- @type string, string, string, string
   local sha, orig_lnum_str, final_lnum_str, size_str = line:match('(%x+) (%d+) (%d+) (%d+)')
-  assert(sha)
+  if not sha then
+    error(("Could not parse sha from line: '%s'"):format(line))
+  end
 
   local orig_lnum = asinteger(orig_lnum_str)
   local final_lnum = asinteger(final_lnum_str)
   local size = asinteger(size_str)
 
-  --- @type table<string,string|true>
-  local commit = commits[sha] or {
-    sha = sha,
-    abbrev_sha = sha:sub(1, 8),
-  }
+  --- @type table<string,string|integer|true>
+  local commit = commits[sha]
+    or {
+      sha = sha,
+      abbrev_sha = sha:sub(1, 8) --[[@as string]],
+    }
 
-  --- @type string, string
+  --- @type string?, string?
   local previous_sha, previous_filename
 
   line = assert(readline())
@@ -111,9 +114,10 @@ local function incremental_iter(readline, commits, result)
     elseif key then
       key = key:gsub('%-', '_') --- @type string
       if vim.endswith(key, '_time') then
-        value = tonumber(value)
+        commit[key] = asinteger(value)
+      else
+        commit[key] = value
       end
-      commit[key] = value
     else
       commit[line] = true
       if line ~= 'boundary' then
@@ -135,7 +139,7 @@ local function incremental_iter(readline, commits, result)
   then
     commit = vim.tbl_extend('force', commit, NOT_COMMITTED)
   end
-  commits[sha] = commit
+  commits[sha] = commit --[[@as Gitsigns.CommitInfo]]
 
   for j = 0, size - 1 do
     result[final_lnum + j] = {
@@ -150,13 +154,24 @@ local function incremental_iter(readline, commits, result)
 end
 
 --- @param data string
---- @return string[]
-local function data_to_lines(data)
+--- @param partial? string
+--- @return string[] lines
+--- @return string? partial
+local function data_to_lines(data, partial)
   local lines = vim.split(data, '\n')
-  if lines[#lines] == '' then
-    lines[#lines] = nil
+  if partial then
+    lines[1] = partial .. lines[1]
+    partial = nil
   end
-  return lines
+
+  -- if data doesn't end with a newline, then the last line is partial
+  if lines[#lines] ~= '' then
+    partial = lines[#lines]
+  end
+
+  -- Clear the last line as it will be empty of the partial line
+  lines[#lines] = nil
+  return lines, partial
 end
 
 --- @param f fun(readline: fun(): string?))
@@ -168,16 +183,19 @@ local function buffered_line_reader(f)
       return
     end
 
-    local data_lines = data_to_lines(data)
+    local data_lines, partial_line = data_to_lines(data)
     local i = 0
 
+    --- @async
     local function readline(peek)
       if not data_lines[i + 1] then
+        -- No more data, wait for more
         data = coroutine.yield()
         if not data then
-          return
+          -- No more data, return the partial line if there is one
+          return partial_line
         end
-        data_lines = data_to_lines(data)
+        data_lines, partial_line = data_to_lines(data, partial_line)
         i = 0
       end
 
@@ -194,6 +212,7 @@ local function buffered_line_reader(f)
   end)
 end
 
+--- @async
 --- @param obj Gitsigns.GitObj
 --- @param contents? string[]
 --- @param lnum? integer
@@ -255,7 +274,9 @@ function M.run_blame(obj, contents, lnum, revision, opts)
   })
 
   if stderr then
-    error_once('Error running git-blame: ' .. stderr)
+    local msg = 'Error running git-blame: ' .. stderr
+    error_once(msg)
+    log.eprint(msg)
     return {}
   end
 

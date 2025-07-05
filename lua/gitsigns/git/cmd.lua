@@ -1,9 +1,10 @@
 local async = require('gitsigns.async')
 local log = require('gitsigns.debug.log')
+local util = require('gitsigns.util')
 
 local system = require('gitsigns.system').system
 
---- @type fun(cmd: string[], opts?: vim.SystemOpts): vim.SystemCompleted
+--- @type async fun(cmd: string[], opts?: vim.SystemOpts): vim.SystemCompleted
 local asystem = async.awrap(3, system)
 
 --- @class Gitsigns.Git.JobSpec : vim.SystemOpts
@@ -31,6 +32,10 @@ end
 --- @return string[] stdout, string? stderr, integer code
 local function git_command(args, spec)
   spec = spec or {}
+  if spec.cwd then
+    -- cwd must be a windows path and not a unix path
+    spec.cwd = util.cygpath(spec.cwd)
+  end
 
   local cmd = flatten({
     'git',
@@ -45,9 +50,6 @@ local function git_command(args, spec)
   if spec.text == nil then
     spec.text = true
   end
-
-  -- Fix #895. Only needed for Nvim 0.9 and older
-  spec.clear_env = true
 
   --- @type vim.SystemCompleted
   local obj = asystem(cmd, spec)

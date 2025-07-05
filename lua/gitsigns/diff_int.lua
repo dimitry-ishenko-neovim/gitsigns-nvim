@@ -1,9 +1,11 @@
 local async = require('gitsigns.async')
-local uv = vim.uv or vim.loop
+local uv = vim.uv or vim.loop ---@diagnostic disable-line: deprecated
 
 local create_hunk = require('gitsigns.hunks').create_hunk
 local config = require('gitsigns.config').config
 
+--- @return fun(v:any): string encode
+--- @return fun(v:string): any decode
 local function getencdec()
   local m = jit and package.preload['string.buffer'] and require('string.buffer') or vim.mpack
   return m.encode, m.decode
@@ -111,7 +113,7 @@ local gaps_between_regions = 5
 --- @return Gitsigns.Hunk.Hunk[]
 local function denoise_hunks(hunks)
   -- Denoise the hunks
-  local ret = { hunks[1] } --- @type Gitsigns.Hunk.Hunk[]
+  local ret = { hunks[1] }
   for j = 2, #hunks do
     local h, n = ret[#ret], hunks[j]
     if not h or not n then
@@ -144,9 +146,12 @@ function M.run_word_diff(removed, added)
   end
 
   for i = 1, #removed do
+    local rmd = removed[i] --- @cast rmd -?
+    local add = added[i] --- @cast add -?
+
     -- pair lines by position
-    local a = table.concat(vim.split(removed[i], ''), '\n')
-    local b = table.concat(vim.split(added[i], ''), '\n')
+    local a = table.concat(vim.split(rmd, ''), '\n')
+    local b = table.concat(vim.split(add, ''), '\n')
 
     local hunks = {} --- @type Gitsigns.Hunk.Hunk[]
     for _, r in ipairs(run_diff(a, b, config.diff_opts)) do

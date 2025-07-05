@@ -52,13 +52,15 @@ local function build_lno_str(win, lnum, width)
   local has_col, statuscol =
     pcall(api.nvim_get_option_value, 'statuscolumn', { win = win, scope = 'local' })
   if has_col and statuscol and statuscol ~= '' then
+    --- @cast statuscol string
     local ok, data = pcall(api.nvim_eval_statusline, statuscol, {
       winid = win,
       use_statuscol_lnum = lnum,
       highlights = true,
     })
     if ok then
-      return data.str, data.highlights
+      local data_str = data.str --[[@as string]]
+      return data_str, data.highlights
     end
   end
   return string.format('%' .. width .. 'd', lnum)
@@ -87,7 +89,8 @@ local function show_added(bufnr, nsw, hunk)
     local offset, rtype, scol, ecol = region[1] - 1, region[2], region[3] - 1, region[4] - 1
 
     -- Special case to handle cr at eol in buffer but not in show text
-    local cr_at_eol_change = rtype == 'change' and vim.endswith(hunk.added.lines[offset + 1], '\r')
+    local cr_at_eol_change = rtype == 'change'
+      and vim.endswith(assert(hunk.added.lines[offset + 1]), '\r')
 
     api.nvim_buf_set_extmark(bufnr, nsw, start_row + offset, scol, {
       end_col = ecol,
@@ -108,7 +111,7 @@ end
 local function show_deleted_in_float(bufnr, nsd, hunk, staged)
   local cwin = api.nvim_get_current_win()
   local virt_lines = {} --- @type [string, string][][]
-  local textoff = vim.fn.getwininfo(cwin)[1].textoff --[[@as integer]]
+  local textoff = assert(vim.fn.getwininfo(cwin)[1]).textoff --[[@as integer]]
   for i = 1, hunk.removed.count do
     local sc = build_lno_str(cwin, hunk.removed.start + i, textoff - 1)
     virt_lines[i] = { { sc, 'LineNr' } }
@@ -142,6 +145,7 @@ local function show_deleted_in_float(bufnr, nsd, hunk, staged)
     anchor = 'SW',
     bufpos = { hunk.added.start - bufpos_offset, 0 },
     style = 'minimal',
+    border = 'none',
   })
 
   vim.bo[pbufnr].filetype = vim.bo[bufnr].filetype
@@ -149,8 +153,8 @@ local function show_deleted_in_float(bufnr, nsd, hunk, staged)
   vim.wo[pwinid].scrolloff = 0
 
   api.nvim_win_call(pwinid, function()
-    -- Expand folds
-    vim.cmd('normal! ' .. 'zR')
+    -- Disable folds
+    vim.wo.foldenable = false
 
     -- Navigate to hunk
     vim.cmd('normal! ' .. tostring(hunk.removed.start) .. 'gg')
@@ -220,18 +224,13 @@ M.preview_hunk = noautocmd(function()
     return
   end
 
-  --- @type Gitsigns.LineSpec
+  --- @type Gitsigns.LineSpec[]
   local preview_linespec = {
-    { { 'Hunk <hunk_no> of <num_hunks>', 'Title' } },
-    unpack(Hunks.linespec_for_hunk(hunk, vim.bo[bufnr].fileformat)),
+    { { ('Hunk %d of %d'):format(index, #bcache.hunks), 'Title' } },
   }
+  vim.list_extend(preview_linespec, Hunks.linespec_for_hunk(hunk, vim.bo[bufnr].fileformat))
 
-  local lines_spec = popup.lines_format(preview_linespec, {
-    hunk_no = index,
-    num_hunks = #cache[bufnr].hunks,
-  })
-
-  popup.create(lines_spec, config.preview_config, 'hunk')
+  popup.create(preview_linespec, config.preview_config, 'hunk')
 end)
 
 --- Preview the hunk at the cursor position inline in the buffer.

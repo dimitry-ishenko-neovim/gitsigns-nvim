@@ -1,6 +1,13 @@
 local api = vim.api
 
-local config = require('gitsigns.config').config
+local Config = require('gitsigns.config')
+local config = Config.config
+
+--- @param s string
+--- @return string
+local function capitalise(s)
+  return s:sub(1, 1):upper() .. s:sub(2)
+end
 
 --- @class Gitsigns.Sign
 --- @field type Gitsigns.SignType
@@ -8,16 +15,44 @@ local config = require('gitsigns.config').config
 --- @field lnum integer
 
 --- @class Gitsigns.Signs
---- @field hls table<Gitsigns.SignType,Gitsigns.SignConfig>
 --- @field name string
 --- @field group string
---- @field config table<string,Gitsigns.SignConfig>
+--- @field config table<Gitsigns.SignType,Gitsigns.SignConfig>
+--- @field staged boolean
 --- @field ns integer
+--- @field private _hl_cache table<Gitsigns.SignType,table<string,string>>
 local M = {}
 
+local km = {
+  culhl = 'Cul',
+  linehl = 'Ln',
+  numhl = 'Nr',
+  hl = '',
+}
+
+--- @param ty Gitsigns.SignType
+--- @param kind 'hl'|'numhl'|'linehl'|'culhl'
+--- @return string?
+function M:hl(ty, kind)
+  if kind ~= 'hl' and not config[kind] then
+    return
+  end
+
+  self._hl_cache = self._hl_cache or {}
+  self._hl_cache[ty] = self._hl_cache[ty] or {}
+
+  if self._hl_cache[ty][kind] then
+    return self._hl_cache[ty][kind]
+  end
+
+  local result = ('GitSigns%s%s%s'):format(self.staged and 'Staged' or '', capitalise(ty), km[kind])
+  self._hl_cache[ty][kind] = result
+  return result
+end
+
 --- @param buf integer
---- @param last_orig? integer
---- @param last_new? integer
+--- @param last_orig integer
+--- @param last_new integer
 function M:on_lines(buf, _, last_orig, last_new)
   -- Remove extmarks on line deletions to mimic
   -- the behaviour of vim signs.
@@ -46,33 +81,31 @@ function M:add(bufnr, signs, filter)
     return
   end
 
-  for _, s in ipairs(signs) do
-    if (not filter or filter(s.lnum)) and not self:contains(bufnr, s.lnum) then
-      local cs = self.config[s.type]
+  for _, sign in ipairs(signs) do
+    if (not filter or filter(sign.lnum)) and not self:contains(bufnr, sign.lnum) then
+      local lnum, ty = sign.lnum, sign.type
+      local cs = self.config[ty]
       local text = cs.text
-      if config.signcolumn and cs.show_count and s.count then
-        local count = s.count
+      if config.signcolumn and cs.show_count and sign.count then
         local cc = config.count_chars
-        local count_char = cc[count] or cc['+'] or ''
-        text = cs.text .. count_char
+        local count_char = cc[sign.count] or cc['+'] or ''
+        text = text .. count_char
       end
 
-      local hls = self.hls[s.type]
-
-      local ok, err = pcall(api.nvim_buf_set_extmark, bufnr, self.ns, s.lnum - 1, 0, {
-        id = s.lnum,
+      local ok, err = pcall(api.nvim_buf_set_extmark, bufnr, self.ns, lnum - 1, 0, {
+        id = lnum,
         sign_text = config.signcolumn and text or '',
         priority = config.sign_priority,
-        sign_hl_group = hls.hl,
-        number_hl_group = config.numhl and hls.numhl or nil,
-        line_hl_group = config.linehl and hls.linehl or nil,
-        cursorline_hl_group = config.culhl and hls.culhl or nil,
+        sign_hl_group = self:hl(ty, 'hl'),
+        number_hl_group = self:hl(ty, 'numhl'),
+        line_hl_group = self:hl(ty, 'linehl'),
+        cursorline_hl_group = self:hl(ty, 'culhl'),
       })
 
       if not ok and config.debug_mode then
         vim.schedule(function()
           error(table.concat({
-            string.format('Error placing extmark on line %d', s.lnum),
+            string.format('Error placing extmark on line %d', sign.lnum),
             err,
           }, '\n'))
         end)
@@ -102,34 +135,17 @@ function M:reset()
   end
 end
 
--- local function capitalise_word(x: string): string
---    return x:sub(1, 1):upper()..x:sub(2)
--- end
-
-function M.new(cfg, name)
+--- @param staged? boolean
+--- @return Gitsigns.Signs
+function M.new(staged)
   local __FUNC__ = 'signs.init'
-
-  -- Add when config.signs.*.[hl,numhl,linehl] are removed
-  -- for _, t in ipairs {
-  --    'add',
-  --    'change',
-  --    'delete',
-  --    'topdelete',
-  --    'changedelete',
-  --    'untracked',
-  -- } do
-  --    local hl = string.format('GitSigns%s%s', name, capitalise_word(t))
-  --    obj.hls[t] = {
-  --       hl       = hl,
-  --       numhl   = hl..'Nr',
-  --       linehl = hl..'Ln',
-  --    }
-  -- end
-
   local self = setmetatable({}, { __index = M })
-  self.config = cfg
-  self.hls = name == 'staged' and config.signs_staged or config.signs
-  self.group = 'gitsigns_signs_' .. (name or '')
+  self.config = staged and config.signs_staged or config.signs
+  Config.subscribe(staged and 'signs_staged' or 'signs', function()
+    self.config = staged and config.signs_staged or config.signs
+  end)
+  self.staged = staged == true
+  self.group = 'gitsigns_signs_' .. (staged and 'staged' or '')
   self.ns = api.nvim_create_namespace(self.group)
   return self
 end

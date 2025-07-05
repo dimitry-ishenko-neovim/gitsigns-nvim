@@ -1,15 +1,15 @@
 --- @class (exact) Gitsigns.SchemaElem
 --- @field type string|string[]|fun(x:any): boolean
 --- @field type_help? string
---- @field refresh? fun(cb: fun()) Function to refresh the config value
+--- @field default_change? fun(cb: fun()) Function to refresh the config value
 --- @field deep_extend? boolean
---- @field default any
+--- @field default? any
 --- @field deprecated? boolean
 --- @field default_help? string
 --- @field description string
 
 --- @class (exact) Gitsigns.DiffOpts
---- @field algorithm string
+--- @field algorithm 'myers'|'minimal'|'patience'|'histogram'
 --- @field internal boolean
 --- @field indent_heuristic boolean
 --- @field vertical boolean
@@ -21,11 +21,7 @@
 
 --- @class (exact) Gitsigns.SignConfig
 --- @field show_count boolean
---- @field hl string
 --- @field text string
---- @field numhl string
---- @field linehl string
---- @field culhl string
 
 --- @alias Gitsigns.SignType
 --- | 'add'
@@ -48,10 +44,8 @@
 --- @field ignore_whitespace? boolean
 --- @field extra_opts? string[]
 
---- @class (exact) Gitsigns.LineBlameOpts : Gitsigns.BlameOpts
---- @field full? boolean
-
 --- @class (exact) Gitsigns.Config
+--- @field package _config table<string,any> config store
 --- @field debug_mode boolean
 --- @field diff_opts Gitsigns.DiffOpts
 --- @field base? string
@@ -65,8 +59,8 @@
 --- @field culhl boolean
 --- @field show_deleted boolean
 --- @field sign_priority integer
---- @field _on_attach_pre fun(bufnr: integer, callback: fun(_: table))
---- @field on_attach fun(bufnr: integer)
+--- @field _on_attach_pre? fun(bufnr: integer, callback: fun(_: table))
+--- @field on_attach? fun(bufnr: integer): boolean?
 --- @field watch_gitdir { enable: boolean, follow_files: boolean }
 --- @field max_file_length integer
 --- @field update_debounce integer
@@ -75,12 +69,13 @@
 --- @field current_line_blame_formatter string|Gitsigns.CurrentLineBlameFmtFun
 --- @field current_line_blame_formatter_nc string|Gitsigns.CurrentLineBlameFmtFun
 --- @field current_line_blame_opts Gitsigns.CurrentLineBlameOpts
---- @field preview_config table<string,any>
+--- @field preview_config vim.api.keyset.win_config
 --- @field auto_attach boolean
 --- @field attach_to_untracked boolean
 --- @field worktrees {toplevel: string, gitdir: string}[]
 --- @field word_diff boolean
 --- @field trouble boolean
+--- @field gh boolean
 --- -- Undocumented
 --- @field _refresh_staged_on_update boolean
 --- @field _threaded_diff boolean
@@ -89,15 +84,12 @@
 --- @field _test_mode boolean
 --- @field _new_sign_calc boolean
 
-local M = {
-  Config = {
-    DiffOpts = {},
-    SignConfig = {},
-    watch_gitdir = {},
-    current_line_blame_opts = {},
-    Worktree = {},
-  },
-}
+--- @class Gitsigns.config
+local M = {}
+
+--- @alias Gitsigns.Config.SubscribersCb fun(old_val:any, new_val:any)
+--- @type table<string, Gitsigns.Config.SubscribersCb[]>
+local subscribers = {}
 
 --- @param v Gitsigns.SchemaElem
 --- @return any
@@ -135,9 +127,9 @@ local function parse_diffopt()
     elseif o == 'horizontal' then
       r.vertical = false
     elseif vim.startswith(o, 'algorithm:') then
-      r.algorithm = string.sub(o, ('algorithm:'):len() + 1)
+      r.algorithm = o:sub(#'algorithm:' + 1) --[[@as 'myers'|'minimal'|'patience'|'histogram']]
     elseif vim.startswith(o, 'linematch:') then
-      r.linematch = tonumber(string.sub(o, ('linematch:'):len() + 1))
+      r.linematch = tonumber(o:sub(('linematch:'):len() + 1))
     end
   end
 
@@ -145,24 +137,53 @@ local function parse_diffopt()
 end
 
 --- @type Gitsigns.Config
-M.config = setmetatable({}, {
-  __index = function(t, k)
-    if rawget(t, k) == nil then
+M.config = setmetatable({ _config = {} }, {
+  --- @param self Gitsigns.Config
+  --- @param k string
+  --- @param v any
+  __newindex = function(self, k, v)
+    local oldv = self._config[k]
+    local field = M.schema[k]
+    if not field then
+      return
+    end
+
+    if field.deep_extend then
+      self._config[k] = vim.tbl_deep_extend('force', resolve_default(field), v)
+    else
+      self._config[k] = v
+    end
+
+    if field.default_change then
+      -- Reinvoke __newindex with the original value whenever the default
+      -- value changes.
+      field.default_change(function()
+        --- @diagnostic disable-next-line: no-unknown
+        self[k] = v
+      end)
+    end
+
+    if oldv ~= nil and not vim.deep_equal(oldv, v) then
+      for _, cb in ipairs(subscribers[k] or {}) do
+        cb(oldv, v)
+      end
+    end
+  end,
+  --- @param self Gitsigns.Config
+  --- @param k string
+  --- @return any
+  __index = function(self, k)
+    -- Most values in the config should have the default (
+    if self._config[k] == nil then
       local field = M.schema[k]
       if not field then
         return
       end
 
-      rawset(t, k, resolve_default(field))
-
-      if field.refresh then
-        field.refresh(function()
-          rawset(t, k, resolve_default(field))
-        end)
-      end
+      self._config[k] = resolve_default(field)
     end
 
-    return rawget(t, k)
+    return self._config[k]
   end,
 })
 
@@ -177,34 +198,6 @@ local function validate_signs(x)
     return false
   end
 
-  local warnings --- @type table<string,true>?
-
-  --- @diagnostic disable-next-line:no-unknown
-  for kind, s in pairs(M.schema.signs.default) do
-    --- @diagnostic disable-next-line:no-unknown
-    for ty, v in pairs(s) do
-      if x[kind] and x[kind][ty] and vim.endswith(ty, 'hl') then
-        warnings = warnings or {}
-        local w = string.format(
-          "'signs.%s.%s' is now deprecated, please define highlight '%s' e.g:\n"
-            .. "  vim.api.nvim_set_hl(0, '%s', { link = '%s' })",
-          kind,
-          ty,
-          v,
-          v,
-          x[kind][ty]
-        )
-        warnings[w] = true
-      end
-    end
-  end
-
-  if warnings then
-    for w in vim.spairs(warnings) do
-      warn(w)
-    end
-  end
-
   return true
 end
 
@@ -215,48 +208,12 @@ M.schema = {
     type = validate_signs,
     deep_extend = true,
     default = {
-      add = {
-        hl = 'GitSignsAdd',
-        text = '┃',
-        numhl = 'GitSignsAddNr',
-        linehl = 'GitSignsAddLn',
-        culhl = 'GitSignsAddCul',
-      },
-      change = {
-        hl = 'GitSignsChange',
-        text = '┃',
-        numhl = 'GitSignsChangeNr',
-        linehl = 'GitSignsChangeLn',
-        culhl = 'GitSignsChangeCul',
-      },
-      delete = {
-        hl = 'GitSignsDelete',
-        text = '▁',
-        numhl = 'GitSignsDeleteNr',
-        linehl = 'GitSignsDeleteLn',
-        culhl = 'GitSignsDeleteCul',
-      },
-      topdelete = {
-        hl = 'GitSignsTopdelete',
-        text = '▔',
-        numhl = 'GitSignsTopdeleteNr',
-        linehl = 'GitSignsTopdeleteLn',
-        culhl = 'GitSignsTopdeleteCul',
-      },
-      changedelete = {
-        hl = 'GitSignsChangedelete',
-        text = '~',
-        numhl = 'GitSignsChangedeleteNr',
-        linehl = 'GitSignsChangedeleteLn',
-        culhl = 'GitSignsChangedeleteCul',
-      },
-      untracked = {
-        hl = 'GitSignsUntracked',
-        text = '┆',
-        numhl = 'GitSignsUntrackedNr',
-        linehl = 'GitSignsUntrackedLn',
-        culhl = 'GitSignsUntrackedCul',
-      },
+      add = { text = '┃' },
+      change = { text = '┃' },
+      delete = { text = '▁' },
+      topdelete = { text = '▔' },
+      changedelete = { text = '~' },
+      untracked = { text = '┆' },
     },
     default_help = [[{
       add          = { text = '┃' },
@@ -287,41 +244,11 @@ M.schema = {
     type = 'table',
     deep_extend = true,
     default = {
-      add = {
-        hl = 'GitSignsStagedAdd',
-        text = '┃',
-        numhl = 'GitSignsStagedAddNr',
-        linehl = 'GitSignsStagedAddLn',
-        culhl = 'GitSignsStagedAddCul',
-      },
-      change = {
-        hl = 'GitSignsStagedChange',
-        text = '┃',
-        numhl = 'GitSignsStagedChangeNr',
-        linehl = 'GitSignsStagedChangeLn',
-        culhl = 'GitSignsStagedChangeCul',
-      },
-      delete = {
-        hl = 'GitSignsStagedDelete',
-        text = '▁',
-        numhl = 'GitSignsStagedDeleteNr',
-        linehl = 'GitSignsStagedDeleteLn',
-        culhl = 'GitSignsStagedDeleteCul',
-      },
-      topdelete = {
-        hl = 'GitSignsStagedTopdelete',
-        text = '▔',
-        numhl = 'GitSignsStagedTopdeleteNr',
-        linehl = 'GitSignsStagedTopdeleteLn',
-        culhl = 'GitSignsStagedTopdeleteCul',
-      },
-      changedelete = {
-        hl = 'GitSignsStagedChangedelete',
-        text = '~',
-        numhl = 'GitSignsStagedChangedeleteNr',
-        linehl = 'GitSignsStagedChangedeleteLn',
-        culhl = 'GitSignsStagedChangedeleteCul',
-      },
+      add = { text = '┃' },
+      change = { text = '┃' },
+      delete = { text = '▁' },
+      topdelete = { text = '▔' },
+      changedelete = { text = '~' },
     },
     default_help = [[{
       add          = { text = '┃' },
@@ -349,7 +276,7 @@ M.schema = {
 
   worktrees = {
     type = 'table',
-    default = nil,
+    default = {},
     description = [[
       Detached working trees.
 
@@ -370,7 +297,6 @@ M.schema = {
 
   _on_attach_pre = {
     type = 'function',
-    default = nil,
     description = [[
       Asynchronous hook called before attaching to a buffer. Mainly used to
       configure detached worktrees.
@@ -392,7 +318,6 @@ M.schema = {
 
   on_attach = {
     type = 'function',
-    default = nil,
     description = [[
       Callback called when attaching to a buffer. Mainly used to setup keymaps.
       The buffer number is passed as the first argument.
@@ -505,7 +430,7 @@ M.schema = {
   diff_opts = {
     type = 'table',
     deep_extend = true,
-    refresh = function(callback)
+    default_change = function(callback)
       vim.api.nvim_create_autocmd('OptionSet', {
         group = vim.api.nvim_create_augroup('gitsigns.config.diff_opts', {}),
         pattern = 'diffopt',
@@ -551,7 +476,6 @@ M.schema = {
 
   base = {
     type = 'string',
-    default = nil,
     default_help = 'index',
     description = [[
       The object/revision to diff against.
@@ -627,7 +551,6 @@ M.schema = {
     type = 'table',
     deep_extend = true,
     default = {
-      border = 'single',
       style = 'minimal',
       relative = 'cursor',
       row = 0,
@@ -812,6 +735,15 @@ M.schema = {
     ]],
   },
 
+  gh = {
+    type = 'boolean',
+    default = false,
+    description = [[
+      Enable GitHub integration. This allows the following features:
+      • `:Gitsigns blame_line` will show PR numbers (with a hyperlink)
+    ]],
+  },
+
   _git_version = {
     type = 'string',
     default = 'auto',
@@ -893,8 +825,26 @@ M.schema = {
   },
 }
 
+--- Subscribe to a config change
+--- @param k string|string[]
+--- @param cb Gitsigns.Config.SubscribersCb
+function M.subscribe(k, cb)
+  if type(k) == 'string' then
+    k = { k }
+  end
+  for _, v in ipairs(k) do
+    subscribers[v] = subscribers[v] or {}
+    table.insert(subscribers[v], cb)
+  end
+end
+
+local nvim011 = vim.fn.has('nvim-0.11') == 1
+
+--- @param k string
+--- @param v any
+--- @param ty string|fun(v:any):boolean
 local function validate(k, v, ty)
-  if vim.fn.has('nvim-0.11') == 1 then
+  if nvim011 then
     --- @diagnostic disable-next-line: redundant-parameter,param-type-mismatch
     vim.validate(k, v, ty)
   else
@@ -902,73 +852,26 @@ local function validate(k, v, ty)
   end
 end
 
---- @param config Gitsigns.Config
-local function validate_config(config)
-  for k, v in
-    pairs(config --[[@as table<string,any>]])
-  do
-    local kschema = M.schema[k]
-    if kschema == nil then
+--- @param user_config table
+function M.build(user_config)
+  --- @cast user_config table<string,any>
+
+  local config = M.config --[[@as table<string,any>]]
+
+  -- Check deprecated config options
+  for k, v in pairs(user_config) do
+    local s = M.schema[k]
+    if not s then
       warn("gitsigns: Ignoring invalid configuration field '%s'", k)
     else
-      local ty = kschema.type
+      local ty = s.type
       if type(ty) == 'string' or type(ty) == 'function' then
         validate(k, v, ty)
       end
-    end
-  end
-end
-
---- @param cfg table<any, any>
-local function handle_deprecated(cfg)
-  for k, v in pairs(M.schema) do
-    local dep = v.deprecated
-    if dep and cfg[k] ~= nil then
-      if type(dep) == 'table' then
-        if dep.hard then
-          if dep.message then
-            warn(dep.message)
-          else
-            warn('%s is now deprecated; ignoring', k)
-          end
-        end
-      else
+      if s.deprecated then
         warn('%s is now deprecated; ignoring', k)
       end
-    end
-  end
-end
-
---- @param k string
---- @param v Gitsigns.SchemaElem
---- @param user_val any
-local function build_field(k, v, user_val)
-  local config = M.config --[[@as table<string,any>]]
-
-  if v.deep_extend then
-    local d = resolve_default(v)
-    config[k] = vim.tbl_deep_extend('force', d, user_val)
-  else
-    config[k] = user_val
-  end
-end
-
---- @param user_config Gitsigns.Config|nil
-function M.build(user_config)
-  user_config = user_config or {}
-
-  handle_deprecated(user_config)
-
-  validate_config(user_config)
-
-  for k, v in pairs(M.schema) do
-    if user_config[k] ~= nil then
-      build_field(k, v, user_config[k])
-      if v.refresh then
-        v.refresh(function()
-          build_field(k, v, user_config[k])
-        end)
-      end
+      config[k] = v
     end
   end
 end

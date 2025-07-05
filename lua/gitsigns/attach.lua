@@ -4,7 +4,8 @@ local git = require('gitsigns.git')
 local Cache = require('gitsigns.cache')
 local log = require('gitsigns.debug.log')
 local manager = require('gitsigns.manager')
-local util = require('gitsigns.util')
+local Util = require('gitsigns.util')
+local Path = Util.Path
 
 local cache = Cache.cache
 local config = require('gitsigns.config').config
@@ -13,7 +14,7 @@ local dprintf = log.dprintf
 local throttle_by_id = require('gitsigns.debounce').throttle_by_id
 
 local api = vim.api
-local uv = vim.loop
+local uv = vim.uv or vim.loop ---@diagnostic disable-line: deprecated
 
 --- @class gitsigns.attach
 local M = {}
@@ -31,7 +32,7 @@ local function parse_git_path(name)
   assert(proto and gitdir and tail)
   local plugin = proto:sub(1, 1):upper() .. proto:sub(2, -2)
 
-  local commit, rel_path --- @type string?, string
+  local commit, rel_path --- @type string?, string?
   if plugin == 'Gitsigns' then
     commit = tail:match('^(:?[^:]+):')
     rel_path = tail:match('^:?[^:]+:(.*)')
@@ -44,7 +45,7 @@ local function parse_git_path(name)
     rel_path = tail:match('^[^/]+/(.*)')
   end
 
-  dprintf("%s buffer for file '%s' from path '%s' on commit '%s'", plugin, rel_path, file, commit)
+  dprintf("%s buffer for file '%s' from path '%s' on commit '%s'", plugin, rel_path, name, commit)
   return rel_path, commit, gitdir
 end
 
@@ -73,6 +74,7 @@ local function on_detach(_, bufnr)
   M.detach(bufnr, true)
 end
 
+--- @async
 --- @param bufnr integer
 --- @return string?
 --- @return string?
@@ -95,28 +97,21 @@ local function on_attach_pre(bufnr)
   return gitdir, toplevel
 end
 
-local setup = util.once(function()
+local setup = Util.once(function()
   manager.setup()
-
-  api.nvim_create_autocmd('OptionSet', {
-    group = 'gitsigns',
-    pattern = { 'fileformat', 'bomb', 'eol' },
-    callback = function()
-      local buf = vim.api.nvim_get_current_buf()
-      local bcache = cache[buf]
-      if not bcache then
-        return
-      end
-      bcache:invalidate(true)
-      async.arun(function()
-        manager.update(buf)
-      end)
-    end,
-  })
 
   require('gitsigns.current_line_blame').setup()
 
+  api.nvim_create_autocmd('BufFilePre', {
+    group = 'gitsigns',
+    desc = 'Gitsigns: detach when changing buffer names',
+    callback = function(args)
+      M.detach(args.buf)
+    end,
+  })
+
   api.nvim_create_autocmd('VimLeavePre', {
+    desc = 'Gitsigns: detach from all buffers',
     group = 'gitsigns',
     callback = M.detach_all,
   })
@@ -128,6 +123,7 @@ end)
 --- @field gitdir? string
 --- @field base? string
 
+--- @async
 --- @param bufnr integer
 --- @return Gitsigns.GitContext? ctx
 --- @return string? err
@@ -136,28 +132,27 @@ local function get_buf_context(bufnr)
     return nil, 'Exceeds max_file_length'
   end
 
-  local file = uv.fs_realpath(api.nvim_buf_get_name(bufnr))
-    or api.nvim_buf_call(bufnr, function()
-      return vim.fn.expand('%:p')
-    end)
+  local bufname = api.nvim_buf_get_name(bufnr)
 
-  local rel_path, commit, gitdir_from_bufname = parse_git_path(file)
+  -- Resolve the buffer name to a real path (following symlinks) if we can,
+  local bufpath = uv.fs_realpath(bufname) or bufname
+
+  local rel_path, commit, gitdir_from_bufname = parse_git_path(bufpath)
 
   if not gitdir_from_bufname then
     if vim.bo[bufnr].buftype ~= '' then
       return nil, 'Non-normal buffer'
-    end
-
-    local file_dir = util.dirname(file)
-    if not file_dir or not util.path_exists(file_dir) then
+    elseif not Path.exists(vim.fs.dirname(bufpath)) then
       return nil, 'Not a path'
+    elseif Path.is_dir(bufpath) then
+      return nil, 'Not a file'
     end
   end
 
   local gitdir_oap, toplevel_oap = on_attach_pre(bufnr)
 
   return {
-    file = rel_path or file,
+    file = rel_path or bufpath,
     gitdir = gitdir_oap or gitdir_from_bufname,
     toplevel = toplevel_oap,
     -- Stage buffers always compare against the common ancestor (':1')
@@ -213,16 +208,16 @@ local attach_throttled = throttle_by_id(function(cbuf, ctx, aucmd)
     encoding = 'utf-8'
   end
 
-  local file = ctx.file
-  if not vim.startswith(file, '/') and ctx.toplevel then
-    file = ctx.toplevel .. util.path_sep .. file
+  local file, toplevel = ctx.file, ctx.toplevel
+  if not Path.is_abs(file) and toplevel then
+    file = Path.join(toplevel, file)
   end
 
   local revision = ctx.base or config.base
   local git_obj = git.Obj.new(file, revision, encoding, ctx.gitdir, ctx.toplevel)
 
   if not git_obj and not passed_ctx then
-    for _, wt in ipairs(config.worktrees or {}) do
+    for _, wt in ipairs(config.worktrees) do
       git_obj = git.Obj.new(file, revision, encoding, wt.gitdir, wt.toplevel)
       if git_obj and git_obj.object_name then
         dprintf('Using worktree %s', vim.inspect(wt))
@@ -247,11 +242,6 @@ local attach_throttled = throttle_by_id(function(cbuf, ctx, aucmd)
     gitdir = git_obj.repo.gitdir,
   })
 
-  if not passed_ctx and (not util.path_exists(file) or uv.fs_stat(file).type == 'directory') then
-    dprint('Not a file')
-    return
-  end
-
   if not git_obj.relpath then
     dprint('Cannot resolve file in repo')
     return
@@ -274,11 +264,7 @@ local attach_throttled = throttle_by_id(function(cbuf, ctx, aucmd)
     return
   end
 
-  cache[cbuf] = Cache.new({
-    bufnr = cbuf,
-    file = file,
-    git_obj = git_obj,
-  })
+  cache[cbuf] = Cache.new(cbuf, file, git_obj)
 
   if config.watch_gitdir.enable then
     local watcher = require('gitsigns.watcher')
@@ -308,6 +294,8 @@ local attach_throttled = throttle_by_id(function(cbuf, ctx, aucmd)
 
   -- Initial update
   manager.update(cbuf)
+
+  dprint('attach complete')
 
   if config.current_line_blame then
     require('gitsigns.current_line_blame').update(cbuf)

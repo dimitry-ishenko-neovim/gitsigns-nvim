@@ -1,5 +1,3 @@
-local util = require('gitsigns.util')
-
 local api = vim.api
 
 local M = {}
@@ -25,8 +23,9 @@ end
 -- Expand height until all lines are visible to account for wrapped lines.
 --- @param winid integer
 --- @param nlines integer
---- @param border string
+--- @param border? any
 local function expand_height(winid, nlines, border)
+  border = border or (vim.fn.exists('&winborder') == 1 and vim.o.winborder or '')
   local newheight = 0
   local maxheight = vim.o.lines - vim.o.cmdheight - (border ~= '' and 2 or 0)
   for _ = 0, 50 do
@@ -53,27 +52,28 @@ end
 
 --- @class (exact) Gitsigns.HlMark
 --- @field hl_group string
---- @field start_row? integer
+--- @field start_row integer
 --- @field start_col? integer
 --- @field end_row? integer
 --- @field end_col? integer
+--- @field url? string
 
 --- Each element represents a multi-line segment
---- @alias Gitsigns.LineSpec [string, string|Gitsigns.HlMark[]][][]
+--- @alias Gitsigns.LineSpec [string, string|Gitsigns.HlMark[], string?][]
 
 --- @param hlmarks Gitsigns.HlMark[]
 --- @param row_offset integer
 local function offset_hlmarks(hlmarks, row_offset)
   for _, h in ipairs(hlmarks) do
-    h.start_row = (h.start_row or 0) + row_offset
+    h.start_row = h.start_row + row_offset
     if h.end_row then
       h.end_row = h.end_row + row_offset
     end
   end
 end
 
---- Partition the text and Gitsigns.HlMarks from a Gitsigns.LineSpec
---- @param fmt Gitsigns.LineSpec
+--- Partition the text and Gitsigns.HlMarks from a Gitsigns.LineSpec[]
+--- @param fmt Gitsigns.LineSpec[]
 --- @return string[]
 --- @return Gitsigns.HlMark[]
 local function partition_linesspec(fmt)
@@ -85,7 +85,7 @@ local function partition_linesspec(fmt)
     local section_text = {} --- @type string[]
     local col = 0
     for _, part in ipairs(section) do
-      local text, hls = part[1], part[2]
+      local text, hls, url = part[1], part[2], part[3]
 
       section_text[#section_text + 1] = text
 
@@ -95,6 +95,7 @@ local function partition_linesspec(fmt)
 
       if type(hls) == 'string' then
         ret[#ret + 1] = {
+          url = url,
           hl_group = hls,
           start_row = row,
           end_row = end_row,
@@ -145,7 +146,7 @@ local ns = api.nvim_create_namespace('gitsigns_popup')
 local function create_buf(lines, highlights)
   local ts = vim.bo.tabstop
   local bufnr = api.nvim_create_buf(false, true)
-  assert(bufnr, 'Failed to create buffer')
+  assert(bufnr ~= 0, 'Failed to create buffer')
 
   vim.bo[bufnr].bufhidden = 'wipe'
 
@@ -161,6 +162,7 @@ local function create_buf(lines, highlights)
   for _, hl in ipairs(highlights) do
     local ok, err = pcall(api.nvim_buf_set_extmark, bufnr, ns, hl.start_row, hl.start_col or 0, {
       hl_group = hl.hl_group,
+      url = hl.url,
       end_row = hl.end_row,
       end_col = hl.end_col,
       hl_eol = true,
@@ -174,7 +176,7 @@ local function create_buf(lines, highlights)
 end
 
 --- @param bufnr integer
---- @param opts table
+--- @param opts vim.api.keyset.win_config
 --- @param id? string|true
 --- @return integer winid
 local function create_win(bufnr, opts, id)
@@ -252,8 +254,8 @@ local function create_win(bufnr, opts, id)
   return winid
 end
 
---- @param lines_spec Gitsigns.LineSpec
---- @param opts table
+--- @param lines_spec Gitsigns.LineSpec[]
+--- @param opts vim.api.keyset.win_config
 --- @param id? string
 --- @return integer winid, integer bufnr
 function M.create(lines_spec, opts, id)
@@ -281,21 +283,6 @@ function M.focus_open(id)
     api.nvim_set_current_win(winid)
   end
   return winid
-end
-
---- @param fmt Gitsigns.LineSpec
---- @param info table
---- @return Gitsigns.LineSpec
-function M.lines_format(fmt, info)
-  local ret = vim.deepcopy(fmt)
-
-  for _, line in ipairs(ret) do
-    for _, s in ipairs(line) do
-      s[1] = util.expand_format(s[1], info)
-    end
-  end
-
-  return ret
 end
 
 return M

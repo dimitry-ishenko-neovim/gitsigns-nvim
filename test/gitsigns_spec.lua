@@ -1,34 +1,47 @@
 local Screen = require('nvim-test.screen')
 local helpers = require('test.gs_helpers')
 
-local clear = helpers.clear
-local command = helpers.api.nvim_command
-local feed = helpers.feed
-local insert = helpers.insert
-local exec_lua = helpers.exec_lua
-local split = vim.split
-local get_buf_var = helpers.api.nvim_buf_get_var
-local fn = helpers.fn
-local system = fn.system
-local expectf = helpers.expectf
-local write_to_file = helpers.write_to_file
-local edit = helpers.edit
+local api = helpers.api
+local check = helpers.check
 local cleanup = helpers.cleanup
-local test_file = helpers.test_file
+local clear = helpers.clear
+local command = api.nvim_command
+local edit = helpers.edit
+local eq = helpers.eq
+local exec_lua = helpers.exec_lua
+local expectf = helpers.expectf
+local feed = helpers.feed
+local fn = helpers.fn
+local get_buf_var = api.nvim_buf_get_var
 local git = helpers.git
-local scratch = helpers.scratch
-local newfile = helpers.newfile
+local insert = helpers.insert
 local match_dag = helpers.match_dag
+local match_debug_messages = helpers.match_debug_messages
 local match_lines = helpers.match_lines
 local n, p, np = helpers.n, helpers.p, helpers.np
-local match_debug_messages = helpers.match_debug_messages
+local newfile = helpers.newfile
+local scratch = helpers.scratch
 local setup_gitsigns = helpers.setup_gitsigns
 local setup_test_repo = helpers.setup_test_repo
+local split = vim.split
+local system = fn.system
 local test_config = helpers.test_config
-local check = helpers.check
-local eq = helpers.eq
+local test_file = helpers.test_file
+local write_to_file = helpers.write_to_file
 
 helpers.env()
+
+---@param bufnr? integer
+local function wait_for_attach(bufnr)
+  helpers.expectf(function()
+    return exec_lua(function(bufnr0)
+      return vim.b[bufnr0 or 0].gitsigns_status_dict.gitdir ~= nil
+    end, bufnr)
+  end)
+  match_debug_messages({
+    ('attach(1): attach complete'):format(bufnr or api.nvim_get_current_buf()),
+  })
+end
 
 describe('gitsigns (with screen)', function()
   local screen --- @type test.screen
@@ -153,7 +166,7 @@ describe('gitsigns (with screen)', function()
     it('can setup mappings', function()
       edit(test_file)
       expectf(function()
-        local res = split(helpers.api.nvim_exec2('nmap <buffer>', { output = true }).output, '\n')
+        local res = split(api.nvim_exec2('nmap <buffer>', { output = true }).output, '\n')
         table.sort(res)
 
         -- Check all keymaps get set
@@ -173,7 +186,12 @@ describe('gitsigns (with screen)', function()
 
       match_debug_messages({
         'attach(1): Attaching (trigger=BufReadPost)',
-        n('new: In git dir'),
+        n('run_job: git --version'),
+        p(
+          'run_job: git .* '
+            .. vim.pesc('rev-parse --show-toplevel --absolute-git-dir --abbrev-ref HEAD')
+        ),
+        n('new: Not in git repo'),
         n('attach(1): Empty git obj'),
       })
     end)
@@ -212,7 +230,7 @@ describe('gitsigns (with screen)', function()
           'run_job: git .* ls%-files %-%-stage %-%-others %-%-exclude%-standard %-%-eol '
             .. vim.pesc(newfile)
         ),
-        n('attach(1): Not a file'),
+        'attach(1): Cannot resolve file in repo',
       })
 
       check({ status = { head = 'main' } })
@@ -458,7 +476,7 @@ describe('gitsigns (with screen)', function()
           ),
           np('run_job: git .* config user.name'),
           np('run_job: git .* ls%-files .*'),
-          n('attach(1): Not a file'),
+          n('attach(1): Cannot resolve file in repo'),
         })
         command('write')
 
@@ -472,7 +490,7 @@ describe('gitsigns (with screen)', function()
         }
 
         if not internal_diff then
-          table.insert(messages, np('run_job: git .* diff .* /tmp/lua_.* /tmp/lua_.*'))
+          table.insert(messages, np('run_job: git .* diff .* /.* /.*'))
         end
 
         match_debug_messages(messages)
@@ -648,14 +666,29 @@ describe('gitsigns (with screen)', function()
 
     helpers.exc_exec('vimgrep ben ' .. scratch .. '/*')
 
-    screen:expect({
-      messages = {
-        {
-          kind = 'quickfix',
-          content = { { '(1 of 2): hello ben' } },
+    if fn.has('nvim-0.12') > 0 then
+      screen:expect({
+        messages = {
+          {
+            kind = '',
+            content = { { scratch .. '/dummy.txt' } },
+          },
+          {
+            kind = 'quickfix',
+            content = { { '(1 of 2): hello ben' } },
+          },
         },
-      },
-    })
+      })
+    else
+      screen:expect({
+        messages = {
+          {
+            kind = 'quickfix',
+            content = { { '(1 of 2): hello ben' } },
+          },
+        },
+      })
+    end
 
     match_debug_messages({
       'attach_autocmd(2): Attaching is disabled',
@@ -777,7 +810,7 @@ describe('gitsigns (with screen)', function()
   end)
 end)
 
-describe('gitsigns', function()
+describe('gitsigns attach', function()
   local config --- @type table
 
   before_each(function()
@@ -811,5 +844,66 @@ describe('gitsigns', function()
     edit(path1)
     command('write')
     helpers.sleep(100)
+  end)
+
+  it('does not error on non-file fugitive buffers (#1277)', function()
+    -- Note this test is testing the attach logic before the git_obj
+    -- is created.
+
+    setup_gitsigns(config)
+
+    -- Since this bufname isn't a valid path, Nvim will not trigger the
+    -- BufNewFile autocmd, therefore we need to manually attach.
+    edit(('fugitive://%s/.git//'):format(scratch))
+    command('Gitsigns attach')
+    match_debug_messages({
+      'attach(1): Empty git obj',
+    })
+  end)
+
+  it('can run diffthis/show when cwd is a subdir of a git repo (#1277)', function()
+    helpers.git_init_scratch()
+    local file = scratch .. '/sub/test'
+    system({ 'mkdir', vim.fs.dirname(file) })
+    write_to_file(file, { 'hello' })
+    git('add', file)
+    git('commit', '-m', 'commit 1')
+    command('cd ' .. vim.fs.dirname(file))
+
+    setup_gitsigns(config)
+
+    edit('test')
+    wait_for_attach()
+
+    command('Gitsigns show')
+    wait_for_attach()
+
+    eq('gitsigns://' .. scratch .. '/.git//:0:sub/test', api.nvim_buf_get_name(0))
+
+    local git_obj = exec_lua(function()
+      return require('gitsigns.cache').cache[1].git_obj
+    end)
+
+    eq(file, git_obj.file)
+    eq(scratch, git_obj.repo.toplevel)
+    eq(scratch .. '/.git', git_obj.repo.gitdir)
+    eq('main', git_obj.repo.abbrev_head)
+  end)
+
+  it('does not error when attaching to files out of tree (#1297)', function()
+    setup_test_repo()
+    setup_gitsigns(config)
+
+    exec_lua(function(scratch0)
+      vim.env.GIT_DIR = scratch0 .. '/.git'
+      vim.env.GIT_WORK_TREE = scratch0
+    end, scratch)
+
+    edit(fn.tempname())
+
+    match_debug_messages({
+      p("get_info: '.*' is outside worktree '.*'"),
+      'attach(1): Empty git obj',
+    })
   end)
 end)
